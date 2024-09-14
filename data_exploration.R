@@ -1,10 +1,10 @@
 library(dplyr)
 library(readr)
 
+
+### Read in accident data ###
 data_path <- "../../Data/FARS Data/"
-
 year_folders <- list.dirs(data_path, full.names = TRUE, recursive = FALSE)
-
 accident_data_list <- list()
 
 for (folder in year_folders) {
@@ -17,7 +17,6 @@ for (folder in year_folders) {
     warning(paste("File not found:", accident_file))
   }
 }
-
 
 normalize_data <- function(df) { ## LATTIDENAME saved as char in some, double in some ##
   if ("LATITUDENAME" %in% names(df)) {
@@ -39,8 +38,7 @@ add_missing_columns <- function(df, all_columns) {
 accident_data_list <- lapply(accident_data_list, add_missing_columns, all_columns = all_columns)
 all_accident_data <- bind_rows(accident_data_list)
 
-print(dim(all_accident_data))  # Print the dimensions of the final dataset
-
+print(dim(all_accident_data))  
 
 
 ## Check that no rows were dropped ##
@@ -63,4 +61,34 @@ total_rows_combined <- nrow(all_accident_data)
 
 cat("Total rows from individual files:", total_rows_from_files, "\n")
 cat("Total rows in combined data frame:", total_rows_combined, "\n")
+
+
+## Check if its correct number of FIPS Code >> https://transition.fcc.gov/oet/info/maps/census/fips/fips.txt
+all_accident_data$STATE <- as.factor(all_accident_data$STATE)
+all_accident_data$COUNTY <- as.factor(all_accident_data$COUNTY)
+
+
+unique_counties_per_state <- all_accident_data %>%
+  group_by(STATE) %>%
+  summarise(unique_counties = n_distinct(COUNTY))
+
+print(unique_counties_per_state) ## 51 unique state codes >> correct
+
+# Groupby STATE
+accidents_by_state <- all_accident_data %>%
+  group_by(STATE) %>%
+  summarise(total_accidents = n()) %>%
+  arrange(desc(total_accidents))
+
+
+## Groupby STATE, YEAR, MONTH
+all_accident_data$YEAR <- as.factor(all_accident_data$YEAR)
+all_accident_data$MONTH <- as.factor(all_accident_data$MONTH)
+
+accidents_by_state_year_month <- all_accident_data %>%
+  group_by(STATE, YEAR, MONTH) %>%
+  summarise(total_accidents = n()) %>%
+  arrange(STATE, YEAR, MONTH)
+
+
 
