@@ -12,15 +12,16 @@ test = df[-tr,]
 
 ## CHANGE
 target_column = ### 
+others_columns = 
 formula <- target_column ~ . - others_columns  # change 
-formula <- Balance ~ . -ID
-target_column = "Balance"
+# formula <- Balance ~ . -ID
+# target_column = "Balance"
 
 num_params = ncol(train)-1
 
-###########################################################
-######## Best Subset Selection >> method = exhaustive 
-###########################################################
+##########################################################
+######## Best Subset Selection >> method = exhaustive ###
+##########################################################
 tic("Best Subset Selection")
 best_subset_model <- regsubsets(formula, data = train, nvmax = ncol(train)-1, method = "exhaustive")
 toc()
@@ -77,9 +78,9 @@ temp.coef = coef(best_subset_model, id = k1aic)
 MSEAIC1 = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
-############################
-###10-fold Cross Validation for Best Subset
-############################
+###############################################
+###10-fold Cross Validation for Best Subset ###
+###############################################
 
 Kf=10 
 
@@ -112,9 +113,9 @@ MSECV = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
 
-###########################################################
-######## Forward Selection >> method = forward 
-###########################################################
+#################################################
+######## Forward Selection >> method = forward### 
+#################################################
 tic("Forward Selection")
 bfssel <- regsubsets(formula, data = train, nvmax = num_params, method = "forward")
 toc()
@@ -172,9 +173,9 @@ temp.coef = coef(bfssel, id = k1aicf)
 MSEAIC1f = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
-############################
-###10-fold Cross Validation for Forward
-############################
+##########################################
+###10-fold Cross Validation for Forward###
+##########################################
 
 Kf=10 
 
@@ -207,19 +208,18 @@ MSECVf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
 
-###########################################################
-######## Backward Selection >> method = backward 
-###########################################################
+##################################################
+######## Backward Selection >> method = backward #
+##################################################
 tic("Backward Selection")
 bbssel <- regsubsets(formula, data = train, nvmax = ncol(train) - 1, method = "backward")
 toc()
 
 sumbbs <- summary(bbssel)
 
-
-best_k_bic <- which.min(sumbbs$bic)
-best_k_aic <- which.min(sumbbs$cp) 
-best_k_adjr2 <- which.max(sumbbs$adjr2) # see model with highest adjusted R-squared >> check if overfit
+kbicb <- which.min(sumbbs$bic)
+kaicb <- which.min(sumbbs$cp) 
+which.max(sumbbs$adjr2) # see model with highest adjusted R-squared >> check if overfit
 
 plot((sumbbs$bic - mean(sumbbs$bic)) / sd(sumbbs$bic), type = "l", col = "blue",
      main = "AIC and BIC", xlab = "Number of predictors (k)", ylab = "Standardized values")
@@ -240,54 +240,43 @@ kaiclb=which.min(AICLb)  #AIC choice, same
 
 #AIC and BIC using iterative procedure
 ## Calculate OOS MSE using AIC and BIC Minimizing models:
-#Get the X-matrix for the test set:
-test.mat = model.matrix( formula , data = test)
-
-#extract coefficients from the best model on BIC
-temp.coef = coef(sumbbs, id = kbicb)
-MSEBICb = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bbssel, id = kbicb)
+MSEBICb = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 varselbicb = names(temp.coef)  # Selected variables on BIC
 
 
 #Repeat this for AIC >> check if all agree/same
-temp.coef = coef(sumbbs, id = kaicb)
-MSEAICb = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bbssel, id = kaicb)
+MSEAICb = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 varselaicb = names(temp.coef)  # Selected variables on AIC
 
-temp.coef = coef(sumbbs, id = kbiclb)
-MSEBICLb = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bbssel, id = kbiclb)
+MSEBICLb = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(sumbbs, id = kaiclb)
-MSEAICLb = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bbssel, id = kaiclb)
+MSEAICLb = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(sumbbs, id = k1bicb)
-MSEBIC1b = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bbssel, id = k1bicb)
+MSEBIC1b = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(sumbbs, id = k1aicb)
-MSEAIC1b = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bbssel, id = k1aicb)
+MSEAIC1b = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
-############################
-###10-fold Cross Validation for Backward
-############################
-
-Kf=10 
-
-split = runif(ntrain) 
-cvgroup = as.numeric(cut(split,quantile(split, probs = seq(0,1,.1)),include.lowest = TRUE))  # groups for K-fold cv
-
-train.mat = model.matrix(target_column~.-other_columns, data=train) 
+############################################
+###10-fold Cross Validation for Backward ###
+############################################
 
 cv_bss = matrix(0,Kf,num_params) #blank for results with dimensions: number of folds by number of models
 for(j in 1:Kf) {
   ii = cvgroup == j #create a logical array with TRUE if cvgroup value belongs to fold number j - a way to identify observations belonging to fold j (test set)
   nii = cvgroup != j #create a logical array with TRUE if cvgroup value DOES NOT belong to (!= denotes "not equal") fold number j - a way to identify observations outside fold j (train set)
-  temp.bss = regsubsets(target_column~.-other_columns, data = train[nii,], nvmax = num_params, method = "backward") #run model search excluding fold j
+  temp.bss = regsubsets(formula, data = train[nii,], nvmax = num_params, method = "backward") #run model search excluding fold j
   for(i in 1:11) {
     temp.coef = coef(temp.bss, id = i)
-    cv_bss[j,i] = sum((train$target_column[ii]-train.mat[ii,names(temp.coef)]%*%temp.coef)^2) #compute fold MSE for each model (k=1 to k=11) 
+    cv_bss[j,i] = sum((train[[target_column]][ii]-train.mat[ii,names(temp.coef)]%*%temp.coef)^2) #compute fold MSE for each model (k=1 to k=11) 
   }
 }
 bestKb = which.min(colSums(cv_bss)) #figure out preferred number of regressors based on some of squared errors (colSums() sums columns of the matrix - the result is a vector of sums)
@@ -300,21 +289,22 @@ plot((colSums(cv_bss)/ntrain), main = "10-fold CV selection", xlab = "k",
 
 # get test set MSE of the model chosen by CV:
 temp.coef = coef(bssel, id = bestK) #extract the coefficient vector of the best model
-MSECVb = mean((test$Balance-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+MSECVb = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
 
-###########################################################
-######## Ridge
-###########################################################
+#############
+### Ridge ###
+#############
 
-x = model.matrix(target_column ~ .-other_columns, data = df)
+x = model.matrix(formula, data = df)
 x = x[, -1]  #omit the intercept 
-y = df$target_column
+y = df[[target_column]]
 
 MSE <- function(pred, truth){ 
   return(mean((truth - pred)^2))
 }
+
 grid = 10^seq(10, -2, length = 100)
 
 ridge.mod <- glmnet(x[train,], y[train], alpha = 0, lambda = grid, thresh = 1e-12) # check test
@@ -370,13 +360,13 @@ MSE(ridge.pred, y[test])
 
 
 
-###########################################################
-######## Ridge-PCA Hybrid Approach
-###########################################################
+#################################
+### Ridge-PCA Hybrid Approach ###
+#################################
 
-x = model.matrix(target_column ~ .-other_columns, data = df)  # Create matrix of predictors
+x = model.matrix(formula, data = df)  # Create matrix of predictors
 x = x[, -1] 
-y = df$target_column
+y = df[[target_column]]
 
 train_index <- sample(1:nrow(x), nrow(x) * 0.7) 
 train <- train_index
