@@ -2,28 +2,34 @@ library(leaps)
 library(tictoc)
 library(glmnet)
 
+# df=Credit
 set.seed(2457829)
 ntrain <- floor(0.7 * nrow(df))  # take 70% train
-tr <- sample(seq_len(nrow(df)), size = ntrain)
-train <- df[tr, ] 
-test <- df[-tr, ]  
 
+tr = sample(1:nrow(df),ntrain)  
+train = df[tr,]   
+test = df[-tr,]  
+
+## CHANGE
+target_column = ### 
 formula <- target_column ~ . - others_columns  # change 
+formula <- Balance ~ . -ID
+target_column = "Balance"
 
+num_params = ncol(train)-1
 
 ###########################################################
 ######## Best Subset Selection >> method = exhaustive 
 ###########################################################
 tic("Best Subset Selection")
-best_subset_model <- regsubsets(formula, data = train, nvmax = ncol(train) - 1, method = "exhaustive")
+best_subset_model <- regsubsets(formula, data = train, nvmax = ncol(train)-1, method = "exhaustive")
 toc()
 
 summary_bss <- summary(best_subset_model)
 
-
-best_k_bic <- which.min(summary_bss$bic)
-best_k_aic <- which.min(summary_bss$cp) 
-best_k_adjr2 <- which.max(summary_bss$adjr2) # see model with highest adjusted R-squared >> check if overfit
+kbic <- which.min(summary_bss$bic)
+kaic <- which.min(summary_bss$cp) 
+which.max(summary_bss$adjr2) 
 
 plot((summary_bss$bic - mean(summary_bss$bic)) / sd(summary_bss$bic), type = "l", col = "blue",
      main = "AIC and BIC", xlab = "Number of predictors (k)", ylab = "Standardized values")
@@ -31,7 +37,7 @@ points((summary_bss$cp - mean(summary_bss$cp)) / sd(summary_bss$cp), type = "l",
 legend("topright", c("BIC", "AIC"), lty = 1, col = c("blue", "red"))
 
 
-#AIC and BIC using error variance estimate from the largest model
+### AIC and BIC using error variance estimate from the largest model ### 
 varest=summary_bss$rss[num_params]/(ntrain-num_params+1) #estimate error variance of the model with k 
 
 #construct the IC with this estimate >> gen sequence of 1 to k to plug into formula
@@ -39,38 +45,36 @@ BICL = summary_bss$rss/ntrain + log(ntrain)*varest*((seq(1,num_params,1))/ntrain
 AICL = summary_bss$rss/ntrain + 2*varest*((seq(1,num_params,1))/ntrain)
 
 kbicl=which.min(BICL) #BIC choice
-
 kaicl=which.min(AICL)  #AIC choice, same
 
-#AIC and BIC using iterative procedure
+
+### AIC and BIC using iterative procedure ###
 ## Calculate OOS MSE using AIC and BIC Minimizing models:
 #Get the X-matrix for the test set:
-test.mat = model.matrix( formula , data = test)
+test.mat = model.matrix(formula, data = test)
 
 #extract coefficients from the best model on BIC
-temp.coef = coef(summary_bss, id = kbic)
-MSEBIC = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
-
+temp.coef = coef(best_subset_model, id = kbicl)
+MSEBIC = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 varselbic = names(temp.coef)  # Selected variables on BIC
 
-
 #Repeat this for AIC >> check if all agree/same
-temp.coef = coef(summary_bss, id = kaic)
-MSEAIC = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(best_subset_model, id = kaicl)
+MSEAIC = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 varselaic = names(temp.coef)  # Selected variables on AIC
 
-temp.coef = coef(summary_bss, id = kbicl)
-MSEBICL = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(best_subset_model, id = kbicl)
+MSEBICL = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(summary_bss, id = kaicl)
-MSEAICL = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(best_subset_model, id = kaicl)
+MSEAICL = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(summary_bss, id = k1bic)
-MSEBIC1 = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(best_subset_model, id = k1bic)
+MSEBIC1 = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(summary_bss, id = k1aic)
-MSEAIC1 = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(best_subset_model, id = k1aic)
+MSEAIC1 = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
 ############################
