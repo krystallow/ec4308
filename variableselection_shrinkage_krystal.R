@@ -7,15 +7,14 @@ library(rpart)
 # df=Credit
 set.seed(2457829)
 ntrain <- floor(0.7 * nrow(df))  # take 70% train
-
 tr = sample(1:nrow(df),ntrain)  
 train = df[tr,]   
 test = df[-tr,]  
 
 ## CHANGE
-target_column = ### 
-others_columns = 
-formula <- target_column ~ . - others_columns  # change 
+target_column <- ""
+others_columns <- c("")
+formula <- as.formula(paste(target_column, "~ . -", paste(others_columns, collapse = " - ")))
 # formula <- Balance ~ . -ID
 # target_column = "Balance"
 
@@ -360,8 +359,6 @@ ridge.pred <- predict(ridge.mod, s = bestlaml, newx = x[test,])
 MSE(ridge.pred, y[test])
 
 
-
-
 #################################
 ### Ridge-PCA Hybrid Approach ###
 #################################
@@ -397,6 +394,43 @@ MSE_ridge_pca <- MSE(ridge_pred, y[test])
 rmse_ridge_pca <- sqrt(test_mse)
 
 
+########################
+### Regression Tree  ###
+########################
 
+# Grow a large tree
+big_tree <- tree(formula, data=train, mindev=0.0001) ## change mindev 
 
+# Check the number of leaves in the big tree
+length(unique(big_tree$where))
+
+# Prune the tree to the optimal size
+pruned_tree <- prune.tree(big_tree, best=7) ## change best
+
+# Check the pruned tree size
+length(unique(pruned_tree$where))
+
+# Plot the big tree and the pruned tree
+#windows()  if can
+#dev.new() 
+par(mfrow=c(1,2))  # Create a 1x2 grid for plotting
+
+# Plot the big tree
+plot(big_tree, type="uniform")
+text(big_tree, col="blue", label=c("yval"), cex=.8)
+
+# Plot the pruned tree
+plot(pruned_tree, type="uniform")
+text(pruned_tree, col="blue", label=c("yval"), cex=.8)
+
+# Predict on the test set and compute Mean Squared Error (MSE)
+pred_big_tree <- predict(big_tree, newdata=test)
+pred_pruned_tree <- predict(pruned_tree, newdata=test)
+
+mse <- function(pred, truth) {
+  mean((truth - pred)^2)
+}
+
+mse_big_tree <- mse(pred_big_tree, test[[target_column]])
+mse_pruned_tree <- mse(pred_pruned_tree, test[[target_column]])
 
