@@ -86,16 +86,16 @@ Kf=10
 split = runif(ntrain) 
 cvgroup = as.numeric(cut(split,quantile(split, probs = seq(0,1,.1)),include.lowest = TRUE))  # groups for K-fold cv
 
-train.mat = model.matrix(target_column~.-other_columns, data=train) 
+train.mat = model.matrix(formula, data=train) 
 
 cv_bss = matrix(0,Kf,num_params) #blank for results with dimensions: number of folds by number of models
 for(j in 1:Kf) {
   ii = cvgroup == j #create a logical array with TRUE if cvgroup value belongs to fold number j - a way to identify observations belonging to fold j (test set)
   nii = cvgroup != j #create a logical array with TRUE if cvgroup value DOES NOT belong to (!= denotes "not equal") fold number j - a way to identify observations outside fold j (train set)
-  temp.bss = regsubsets(target_column~.-other_columns, data = train[nii,], nvmax = num_params, method = "exhaustive") #run model search excluding fold j
+  temp.bss = regsubsets(formula, data = train[nii,], nvmax = num_params, method = "exhaustive") #run model search excluding fold j
   for(i in 1:11) {
     temp.coef = coef(temp.bss, id = i)
-    cv_bss[j,i] = sum((train$target_column[ii]-train.mat[ii,names(temp.coef)]%*%temp.coef)^2) #compute fold MSE for each model (k=1 to k=11) 
+    cv_bss[j,i] = sum((train[[target_column]][ii]-train.mat[ii,names(temp.coef)]%*%temp.coef)^2) #compute fold MSE for each model (k=1 to k=11) 
   }
 }
 bestK = which.min(colSums(cv_bss)) #figure out preferred number of regressors based on some of squared errors (colSums() sums columns of the matrix - the result is a vector of sums)
@@ -108,7 +108,7 @@ plot((colSums(cv_bss)/ntrain), main = "10-fold CV selection", xlab = "k",
 
 # get test set MSE of the model chosen by CV:
 temp.coef = coef(bssel, id = bestK) #extract the coefficient vector of the best model
-MSECV = mean((test$Balance-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+MSECV = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
 
@@ -116,24 +116,23 @@ MSECV = mean((test$Balance-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 ######## Forward Selection >> method = forward 
 ###########################################################
 tic("Forward Selection")
-bfssel <- regsubsets(formula, data = train, nvmax = ncol(train) - 1, method = "forward")
+bfssel <- regsubsets(formula, data = train, nvmax = num_params, method = "forward")
 toc()
 
 sumbfs <- summary(bfssel)
 
-
-best_k_bic <- which.min(sumbfs$bic)
-best_k_aic <- which.min(sumbfs$cp) 
+kbicf <- which.min(sumbfs$bic)
+kaicf <- which.min(sumbfs$cp) 
 best_k_adjr2 <- which.max(sumbfs$adjr2) # see model with highest adjusted R-squared >> check if overfit
 
-plot((sumbfs$bic - mean(sumbfs$bic)) / sd(sumbfs$bic), type = "l", col = "blue",
-     main = "AIC and BIC", xlab = "Number of predictors (k)", ylab = "Standardized values")
-points((sumbfs$cp - mean(sumbfs$cp)) / sd(sumbfs$cp), type = "l", col = "red")
-legend("topright", c("BIC", "AIC"), lty = 1, col = c("blue", "red"))
+plot((sumbfs$bic-mean(sumbfs$bic))/sd(sumbfs$bic), main = "AIC and BIC (Standardized)", xlab = "k",
+     ylab = "IC", type = "l", col = "blue")
+points((sumbfs$cp-mean(sumbfs$cp))/sd(sumbfs$cp), type = "l", col = "red")
+legend("topright", c("BIC","AIC"),lty=c(1,1) ,col=c("blue","red"))
 
 
 #AIC and BIC using error variance estimate from the largest model
-varestf=sumbfs$rss[num_params]/(ntrain-num_params+1) #estimate error variance of the model with k 
+varestf=sumbfs$rss[num_params]/(ntrain-num_params-1) #estimate error variance of the model with k 
 
 #construct the IC with this estimate >> gen sequence of 1 to k to plug into formula
 BICLf = sumbfs$rss/ntrain + log(ntrain)*varestf*((seq(1,num_params,1))/ntrain)
@@ -146,32 +145,31 @@ kaiclf=which.min(AICLf)  #AIC choice, same
 #AIC and BIC using iterative procedure
 ## Calculate OOS MSE using AIC and BIC Minimizing models:
 #Get the X-matrix for the test set:
-test.mat = model.matrix( formula , data = test)
+test.mat = model.matrix(formula , data = test)
 
 #extract coefficients from the best model on BIC
-temp.coef = coef(summary_bss, id = kbicf)
-MSEBICf = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bfssel, id = kbicf)
+MSEBICf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 varselbic = names(temp.coef)  # Selected variables on BIC
 
-
 #Repeat this for AIC >> check if all agree/same
-temp.coef = coef(summary_bss, id = kaicf)
-MSEAICf = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bfssel, id = kaicf)
+MSEAICf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 varselaic = names(temp.coef)  # Selected variables on AIC
 
-temp.coef = coef(summary_bss, id = kbiclf)
-MSEBICLf = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bfssel, id = kbiclf)
+MSEBICLf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(summary_bss, id = kaiclf)
-MSEAICfL = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bfssel, id = kaiclf)
+MSEAICfL = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(summary_bss, id = k1bicf)
-MSEBIC1f = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bfssel, id = k1bicf)
+MSEBIC1f = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(summary_bss, id = k1aicf)
-MSEAIC1f = mean((test$target_column-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bfssel, id = k1aicf)
+MSEAIC1f = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
 ############################
@@ -189,13 +187,13 @@ cv_fss = matrix(0,Kf,num_params) #blank for results with dimensions: number of f
 for(j in 1:Kf) {
   ii = cvgroup == j #create a logical array with TRUE if cvgroup value belongs to fold number j - a way to identify observations belonging to fold j (test set)
   nii = cvgroup != j #create a logical array with TRUE if cvgroup value DOES NOT belong to (!= denotes "not equal") fold number j - a way to identify observations outside fold j (train set)
-  temp.bss = regsubsets(target_column~.-other_columns, data = train[nii,], nvmax = num_params, method = "forward") #run model search excluding fold j
+  temp.bss = regsubsets(formula, data = train[nii,], nvmax = num_params, method = "forward") #run model search excluding fold j
   for(i in 1:11) {
     temp.coef = coef(temp.bss, id = i)
-    cv_fss[j,i] = sum((train$target_column[ii]-train.mat[ii,names(temp.coef)]%*%temp.coef)^2) #compute fold MSE for each model (k=1 to k=11) 
+    cv_fss[j,i] = sum((train[[target_column]][ii]-train.mat[ii,names(temp.coef)]%*%temp.coef)^2) #compute fold MSE for each model (k=1 to k=11) 
   }
 }
-bestK = which.min(colSums(cv_fss)) #figure out preferred number of regressors based on some of squared errors (colSums() sums columns of the matrix - the result is a vector of sums)
+bestKf = which.min(colSums(cv_fss)) #figure out preferred number of regressors based on some of squared errors (colSums() sums columns of the matrix - the result is a vector of sums)
 cvfss_min = min(colSums(cv_fss)/ntrain) #in-sample MSE of CV-selected model (just need to divide by N - squared errors already summed up in the previous line)
 
 
@@ -204,8 +202,8 @@ plot((colSums(cv_fss)/ntrain), main = "10-fold CV selection", xlab = "k",
 
 
 # get test set MSE of the model chosen by CV:
-temp.coef = coef(bssel, id = bestK) #extract the coefficient vector of the best model
-MSECVf = mean((test$Balance-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+temp.coef = coef(bssel, id = bestKf) #extract the coefficient vector of the best model
+MSECVf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
 
@@ -230,7 +228,7 @@ legend("topright", c("BIC", "AIC"), lty = 1, col = c("blue", "red"))
 
 
 #AIC and BIC using error variance estimate from the largest model
-varestb=sumbbs$rss[num_params]/(ntrain-num_params+1) #estimate error variance of the model with k 
+varestb=sumbbs$rss[num_params]/(ntrain-num_params-1) #estimate error variance of the model with k 
 
 #construct the IC with this estimate >> gen sequence of 1 to k to plug into formula
 BICLb = sumbbs$rss/ntrain + log(ntrain)*varestb*((seq(1,num_params,1))/ntrain)
