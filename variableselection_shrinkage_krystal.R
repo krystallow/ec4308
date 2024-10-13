@@ -1,6 +1,8 @@
 library(leaps)
 library(tictoc)
 library(glmnet)
+library(tree)
+library(rpart)
 
 # df=Credit
 set.seed(2457829)
@@ -393,5 +395,8 @@ ridge_pred <- predict(ridge_mod, s = best_lambda, newx = as.matrix(x_test_pca))
 MSE_ridge_pca <- MSE(ridge_pred, y[test])
 
 rmse_ridge_pca <- sqrt(test_mse)
+
+
+
 
 
