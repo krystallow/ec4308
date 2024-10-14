@@ -399,13 +399,13 @@ rmse_ridge_pca <- sqrt(test_mse)
 ########################
 
 # Grow a large tree
-big_tree <- tree(formula, data=train, mindev=0.0001) ## change mindev 
+big_tree <- tree(formula, data=train, mindev=0.0001) ## change mindev for depth of tree
 
 # Check the number of leaves in the big tree
 length(unique(big_tree$where))
 
 # Prune the tree to the optimal size
-pruned_tree <- prune.tree(big_tree, best=7) ## change best
+pruned_tree <- prune.tree(big_tree, best=7) ## change best, see the shape of tree first to prune
 
 # Check the pruned tree size
 length(unique(pruned_tree$where))
