@@ -5,7 +5,7 @@ library(pls)
 set.seed(2457829)
 
 ntrain= #number of training data
-  train = sample(1:nrow(x),ntrain)
+train = sample(1:nrow(x),ntrain)
 test = (-train)
 MSE <- function(pred, truth){
   return(mean((truth - pred)^2)) 
