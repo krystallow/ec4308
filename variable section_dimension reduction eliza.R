@@ -18,7 +18,7 @@ x=x[,2:ncol(x)] #omit the intercept -run on demeaned data without one
 
 y =  #define Y
   
-  ################################
+################################
 # LASSO
 ################################
 
@@ -108,7 +108,7 @@ for (i in seq_along(results)) {
 }
 
 #################################
-##Principal components regression
+# Principal components regression
 ##################################
 
 #Examine the fit syntax:
@@ -131,7 +131,7 @@ pcr.pred=predict(pcr.fit, newdata=x[test,])
 mse_pcr = MSE(pcr.pred,y[test])
 
 ##########################################
-##Principal components regression + LASSO
+# Principal components regression + LASSO
 ##########################################
 
 comps.mat=pcr.fit$scores
