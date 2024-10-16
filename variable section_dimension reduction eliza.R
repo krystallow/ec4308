@@ -27,10 +27,21 @@ plot(lasso.mod) #this allows you to plot coefficients as a function of your L1-b
 cv.out10u = cv.glmnet(x[train,], y[train], alpha = 1)
 plot(cv.out10u)
 plot(cv.out10u$lambda,cv.out10u$cvm, main="10-fold CV", xlab="Lambda", ylab="CV MSE")
-
 bestlam10u = cv.out10u$lambda.min
 lasso.pred <- predict(lasso.mod, s = bestlam10u, newx = x[test,])
 mse_lasso_cv = MSE(lasso.pred, y[test])
+
+lasso.selected <- glmnet(x[train, ], y[train], alpha = 1, lambda = bestlam10u)
+lasso_coef <- coef(lasso.selected)
+# Convert to a data frame for easier interpretation
+selected_vars <- as.data.frame(as.matrix(lasso_coef))
+selected_vars <- selected_vars[selected_vars[, 1] != 0, , drop = FALSE]
+
+# Rename the columns for clarity
+colnames(selected_vars) <- c("Coefficient")
+
+# View the selected variables
+print(selected_vars)
 
 # Plug in lambda choice
 rlasso.fit = rlasso(y[train]~x[train,],  post=FALSE)
