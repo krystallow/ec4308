@@ -3,9 +3,10 @@ library(tictoc)
 library(glmnet)
 library(tree)
 library(rpart)
+library(caret)
 library(readxl)
 
-Transformed_Dataset <- read_excel("~/Library/Mobile Documents/com~apple~CloudDocs/YEAR 4/Semester 1/EC4308/Project/ec4308-project/Transformed_Dataset.xlsx")
+Transformed_Dataset <- read_excel("Transformed_Dataset.xlsx")
 
 df <- Transformed_Dataset
 df <- df[-1, ]
@@ -19,9 +20,8 @@ test = df[-tr,]
 ## CHANGE
 target_column <- "INDPRO"
 others_columns <- c("sasdate")
-formula <- as.formula(paste(target_column, "~ . -", paste(others_columns, collapse = " - ")))
-# formula <- Balance ~ . -ID
-# target_column = "Balance"
+formula <- as.formula(paste(target_column, "~.-", paste(others_columns, collapse = "-")))
+##
 
 num_params = ncol(train)-1
 
@@ -137,13 +137,20 @@ plot((sumbfs$bic-mean(sumbfs$bic))/sd(sumbfs$bic), main = "AIC and BIC (Standard
 points((sumbfs$cp-mean(sumbfs$cp))/sd(sumbfs$cp), type = "l", col = "red")
 legend("topright", c("BIC","AIC"),lty=c(1,1) ,col=c("blue","red"))
 
-
 #AIC and BIC using error variance estimate from the largest model
-varestf=sumbfs$rss[num_params]/(ntrain-num_params-1) #estimate error variance of the model with k 
+### Estimate error variance of the largest model selected
+varestf <- sumbfs$rss[length(sumbfs$rss)] / (ntrain - length(sumbfs$rss) - 1)
 
-#construct the IC with this estimate >> gen sequence of 1 to k to plug into formula
-BICLf = sumbfs$rss/ntrain + log(ntrain)*varestf*((seq(1,num_params,1))/ntrain)
-AICLf = sumbfs$rss/ntrain + 2*varestf*((seq(1,num_params,1))/ntrain)
+### Construct the BIC using error variance estimate and the correct model sizes
+BICLf <- sumbfs$rss / ntrain + log(ntrain) * varestf * ((seq(1, length(sumbfs$rss), 1)) / ntrain)
+### Plot the standardized BIC for comparison
+plot(BICLf, type = "l", col = "green", main = "BIC with Error Variance Estimate", 
+     xlab = "Number of Predictors", ylab = "BIC")
+### Construct the AIC using error variance estimate and the correct model sizes
+AICLf <- sumbfs$rss / ntrain + 2 * varestf * ((seq(1, length(sumbfs$rss), 1)) / ntrain)
+### Plot the standardized AIC for comparison
+plot(AICLf, type = "l", col = "orange", main = "AIC with Error Variance Estimate", 
+     xlab = "Number of Predictors", ylab = "AIC")
 
 kbiclf=which.min(BICLf) #BIC choice
 
@@ -152,7 +159,11 @@ kaiclf=which.min(AICLf)  #AIC choice, same
 #AIC and BIC using iterative procedure
 ## Calculate OOS MSE using AIC and BIC Minimizing models:
 #Get the X-matrix for the test set:
-test.mat = model.matrix(formula , data = test)
+complete_cases <- complete.cases(test) ## for dropped NA rows
+test <- test[complete_cases, ]
+test.mat <- test.mat[complete_cases, ]
+
+test.mat = model.matrix(formula, data = test)
 
 #extract coefficients from the best model on BIC
 temp.coef = coef(bfssel, id = kbicf)
@@ -172,12 +183,6 @@ MSEBICLf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^
 temp.coef = coef(bfssel, id = kaiclf)
 MSEAICfL = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(bfssel, id = k1bicf)
-MSEBIC1f = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
-
-temp.coef = coef(bfssel, id = k1aicf)
-MSEAIC1f = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
-
 
 ##########################################
 ###10-fold Cross Validation for Forward###
@@ -188,7 +193,7 @@ Kf=10
 split = runif(ntrain) 
 cvgroup = as.numeric(cut(split,quantile(split, probs = seq(0,1,.1)),include.lowest = TRUE))  # groups for K-fold cv
 
-train.mat = model.matrix(target_column~.-other_columns, data=train) 
+train.mat = model.matrix(formula, data=train) 
 
 cv_fss = matrix(0,Kf,num_params) #blank for results with dimensions: number of folds by number of models
 for(j in 1:Kf) {
@@ -209,8 +214,33 @@ plot((colSums(cv_fss)/ntrain), main = "10-fold CV selection", xlab = "k",
 
 
 # get test set MSE of the model chosen by CV:
-temp.coef = coef(bssel, id = bestKf) #extract the coefficient vector of the best model
+temp.coef = coef(bfssel, id = bestKf) #extract the coefficient vector of the best model
 MSECVf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+
+kbicf <- which.min(sumbfs$bic)  # Best model according to BIC
+temp.coef_bic <- coef(bfssel, id = kbicf)  # Extract coefficients
+varselbic <- names(temp.coef_bic)  # Selected variables for BIC
+
+kaicf <- which.min(sumbfs$cp)  # Best model according to AIC
+temp.coef_aic <- coef(bfssel, id = kaicf)  # Extract coefficients
+varselaic <- names(temp.coef_aic)  # Selected variables for AIC
+
+bestKf <- which.min(colSums(cv_fss))  # Best model based on cross-validation
+temp.coef_cv <- coef(bfssel, id = bestKf)  # Extract coefficients
+varselcv <- names(temp.coef_cv)  # Selected variables for CV
+
+
+# BIC-selected model
+cat("Variables selected by BIC:\n", varselbic, "\n")
+cat("Coefficients for BIC-selected model:\n", temp.coef_bic, "\n")
+
+# AIC-selected model
+cat("Variables selected by AIC:\n", varselaic, "\n")
+cat("Coefficients for AIC-selected model:\n", temp.coef_aic, "\n")
+
+# CV-selected model
+cat("Variables selected by CV:\n", varselcv, "\n")
+cat("Coefficients for CV-selected model:\n", temp.coef_cv, "\n")
 
 
 
@@ -234,11 +264,19 @@ legend("topright", c("BIC", "AIC"), lty = 1, col = c("blue", "red"))
 
 
 #AIC and BIC using error variance estimate from the largest model
-varestb=sumbbs$rss[num_params]/(ntrain-num_params-1) #estimate error variance of the model with k 
+### Estimate error variance of the largest model selected
+varestb <- sumbbs$rss[length(sumbbs$rss)] / (ntrain - length(sumbbs$rss) - 1)
 
-#construct the IC with this estimate >> gen sequence of 1 to k to plug into formula
-BICLb = sumbbs$rss/ntrain + log(ntrain)*varestb*((seq(1,num_params,1))/ntrain)
-AICLb = sumbbs$rss/ntrain + 2*varestb*((seq(1,num_params,1))/ntrain)
+### Construct the BIC using error variance estimate and the correct model sizes
+BICLb <- sumbbs$rss / ntrain + log(ntrain) * varestb * ((seq(1, length(sumbbs$rss), 1)) / ntrain)
+### Plot the standardized BIC for comparison
+plot(BICLb, type = "l", col = "green", main = "BIC with Error Variance Estimate", 
+     xlab = "Number of Predictors", ylab = "BIC")
+### Construct the AIC using error variance estimate and the correct model sizes
+AICLb <- sumbbs$rss / ntrain + 2 * varestb * ((seq(1, length(sumbbs$rss), 1)) / ntrain)
+### Plot the standardized AIC for comparison
+plot(AICLb, type = "l", col = "orange", main = "AIC with Error Variance Estimate", 
+     xlab = "Number of Predictors", ylab = "AIC")
 
 kbiclb=which.min(BICLb) #BIC choice
 
@@ -264,11 +302,6 @@ MSEBICLb = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^
 temp.coef = coef(bbssel, id = kaiclb)
 MSEAICLb = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-temp.coef = coef(bbssel, id = k1bicb)
-MSEBIC1b = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
-
-temp.coef = coef(bbssel, id = k1aicb)
-MSEAIC1b = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 
 ############################################
@@ -294,99 +327,130 @@ plot((colSums(cv_bss)/ntrain), main = "10-fold CV selection", xlab = "k",
 
 
 # get test set MSE of the model chosen by CV:
-temp.coef = coef(bssel, id = bestK) #extract the coefficient vector of the best model
+temp.coef = coef(bbssel, id = bestKb) #extract the coefficient vector of the best model
 MSECVb = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+
+
+# BIC-selected model
+kbicb <- which.min(sumbbs$bic)
+temp.coef_bicb <- coef(bbssel, id = kbicb)  # Extract coefficients for the BIC-selected model
+varsel_bicb <- names(temp.coef_bicb)  # Selected variables for BIC
+
+# Print selected variables and coefficients
+cat("Variables selected by BIC:\n", varsel_bicb, "\n")
+cat("Coefficients for BIC-selected model:\n", temp.coef_bicb, "\n")
+
+# AIC-selected model
+kaicb <- which.min(sumbbs$cp)
+temp.coef_aicb <- coef(bbssel, id = kaicb)  # Extract coefficients for the AIC-selected model
+varsel_aicb <- names(temp.coef_aicb)  # Selected variables for AIC
+
+# Print selected variables and coefficients
+cat("Variables selected by AIC:\n", varsel_aicb, "\n")
+cat("Coefficients for AIC-selected model:\n", temp.coef_aicb, "\n")
+
+# CV-selected model
+bestKb <- which.min(colSums(cv_bss))  # Best model based on CV
+temp.coef_cv <- coef(bbssel, id = bestKb)  # Extract coefficients for the CV-selected model
+varsel_cv <- names(temp.coef_cv)  # Selected variables for CV
+
+# Print selected variables and coefficients
+cat("Variables selected by CV:\n", varsel_cv, "\n")
+cat("Coefficients for CV-selected model:\n", temp.coef_cv, "\n")
 
 
 
 #############
 ### Ridge ###
 #############
+x <- model.matrix(formula, data = df)
+x <- x[, -1]  # Omit the intercept
+y <- df[[target_column]]
 
-x = model.matrix(formula, data = df)
-x = x[, -1]  #omit the intercept 
-y = df[[target_column]]
+print(dim(df))
+print(dim(x))
+print(length(y))
+
+set.seed(2457829)
+ntrain <- floor(0.7 * nrow(x))
+tr <- sample(seq_len(nrow(x)), ntrain)  
+tst <- setdiff(seq_len(nrow(x)), tr)
+grid = 10^seq(10, -2, length = 100)
+
+if (all(tr <= nrow(x))) {  
+  # Fit the ridge regression model
+  ridge.mod <- glmnet(x[tr, ], y[tr], alpha = 0, lambda = grid, thresh = 1e-12)
+} else {  
+  stop("Some indices in tr are out of bounds for the model matrix x.")
+}
 
 MSE <- function(pred, truth){ 
   return(mean((truth - pred)^2))
 }
 
-grid = 10^seq(10, -2, length = 100)
-
-ridge.mod <- glmnet(x[train,], y[train], alpha = 0, lambda = grid, thresh = 1e-12) # check test
-
 
 ## Choose Lambda by 10-fold CV with auto defined grid:
-cv.out10d = cv.glmnet(x[train,], y[train], alpha = 0) 
+cv.out10d = cv.glmnet(x[tr,], y[tr], alpha = 0) 
 plot(cv.out10d) 
 plot(cv.out10d$lambda,cv.out10d$cvm, main="10-fold CV default settings", xlab="Lambda", ylab="CV MSE")
 bestlam10d = cv.out10d$lambda.min
 bestlam10d
 
 # RMSE associated with the value of lambda chosen by cross-validation >> AUTO GRID
-ridge.pred <- predict(ridge.mod, s = bestlam10d, newx = x[test,])
-MSE(ridge.pred, y[test])
+ridge.pred <- predict(ridge.mod, s = bestlam10d, newx = x[tst,])
+MSE(ridge.pred, y[tst])
 
 ## Choose Lambda with 10-fold CV with user defined grid:
-cv.out10u = cv.glmnet(x[train,], y[train], alpha = 0, lambda=grid)
+cv.out10u = cv.glmnet(x[tr,], y[tr], alpha = 0, lambda=grid)
 plot(cv.out10u)
 plot(cv.out10d$lambda,cv.out10d$cvm, main="10-fold CV user-defined grid", xlab="Lambda", ylab="CV MSE") 
 bestlam10u = cv.out10u$lambda.min
 bestlam10u
 
 # RMSE associated with the value of lambda chosen by cross-validation >> USER GRID
-ridge.pred <- predict(ridge.mod, s = bestlam10u, newx = x[test,])
-MSE(ridge.pred, y[test])
+ridge.pred <- predict(ridge.mod, s = bestlam10u, newx = x[tst,])
+MSE(ridge.pred, y[tst])
 
 
 # Check LOOCV
-cv.outl = cv.glmnet(x[train,], y[train], alpha = 0, lambda=grid, nfolds=300)
+cv.outl = cv.glmnet(x[tr,], y[tr], alpha = 0, lambda=grid, nfolds=300)
 plot(cv.outl$lambda,cv.outl$cvm, main="LOOCV user-defined grid", xlab="Lambda", ylab="CV MSE")
 bestlaml = cv.outl$lambda.min
 bestlaml
 
 # RMSE associated with the value of lambda chosen by cross-validation >> LOOCV USER GRID
-ridge.pred <- predict(ridge.mod, s = bestlaml, newx = x[test,])
-MSE(ridge.pred, y[test])
+ridge.pred <- predict(ridge.mod, s = bestlaml, newx = x[tst,])
+MSE(ridge.pred, y[tst])
 
 
 # define a finer grid just to check values closer to 0 (100 equally spaced point from 0.001 to 5)
 grid2 = seq(0.001, 5, length=100) ## change 
 
 # Re-Check LOOCV with the new grid
-cv.outl = cv.glmnet(x[train,], y[train], alpha = 0, lambda=grid2, nfolds=300)
+cv.outl = cv.glmnet(x[tr,], y[tr], alpha = 0, lambda=grid2, nfolds=300)
 plot(cv.outl$lambda,cv.outl$cvm, main="LOOCV user-defined grid", xlab="Lambda", ylab="CV MSE")
 bestlaml = cv.outl$lambda.min
 bestlaml
 
 # RMSE associated with the value of lambda chosen by cross-validation >> LOOCV with NEW grid
-ridge.pred <- predict(ridge.mod, s = bestlaml, newx = x[test,])
-MSE(ridge.pred, y[test])
+ridge.pred <- predict(ridge.mod, s = bestlaml, newx = x[tst,])
+MSE(ridge.pred, y[tst])
 
 
 #################################
 ### Ridge-PCA Hybrid Approach ###
 #################################
-
-x = model.matrix(formula, data = df)  # Create matrix of predictors
-x = x[, -1] 
-y = df[[target_column]]
-
-train_index <- sample(1:nrow(x), nrow(x) * 0.7) 
-train <- train_index
-test <- -train_index
-
 # standardise before PCA
-pca_model <- preProcess(x[train,], method = c("center", "scale", "pca"))
+pca_model <- preProcess(x[tr,], method = c("center", "scale", "pca"))
 
-x_train_pca <- predict(pca_model, x[train,])
-x_test_pca <- predict(pca_model, x[test,])
+x_train_pca <- predict(pca_model, x[tr,])
+x_test_pca <- predict(pca_model, x[tst,])
 
 grid = 10^seq(10, -2, length = 100) ## define again further on
-ridge_mod <- glmnet(as.matrix(x_train_pca), y[train], alpha = 0, lambda = grid, thresh = 1e-12)
+ridge_mod <- glmnet(as.matrix(x_train_pca), y[tr], alpha = 0, lambda = grid, thresh = 1e-12)
 
 # choose lambda based on 10 fold CV
-cv_out = cv.glmnet(as.matrix(x_train_pca), y[train], alpha = 0, lambda = grid, nfolds = 10)
+cv_out = cv.glmnet(as.matrix(x_train_pca), y[tr], alpha = 0, lambda = grid, nfolds = 10)
 best_lambda = cv_out$lambda.min
 
 plot(cv_out)
@@ -394,9 +458,7 @@ plot(cv_out$lambda, cv_out$cvm, main = "10-fold CV Ridge-PCA", xlab = "Lambda", 
 
 ridge_pred <- predict(ridge_mod, s = best_lambda, newx = as.matrix(x_test_pca))
 
-MSE_ridge_pca <- MSE(ridge_pred, y[test])
-
-rmse_ridge_pca <- sqrt(test_mse)
+MSE_ridge_pca <- MSE(ridge_pred, y[tst])
 
 
 ########################
