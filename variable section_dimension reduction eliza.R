@@ -3,33 +3,30 @@ library(hdm)
 library(pls)
 
 set.seed(2457829)
-
-ntrain= #number of training data
+data <- read_excel("Transformed_Dataset.xlsx", range = "B1:DA775")
+data = data[-1,]
+data_clean <- na.omit(data)
+# Now create model matrix
+x = model.matrix(INDPRO~., data = data_clean)
+y = data_clean$INDPRO
+ntrain= floor(0.7* 773)  #number of training data -> 70% of total obs
 train = sample(1:nrow(x),ntrain)
 test = (-train)
 MSE <- function(pred, truth){
   return(mean((truth - pred)^2)) 
 }
 
-#model.matrix creates a matrix of predictors and transforms qualitative variables into dummy variables which is necessary for glmnet()
-x = model.matrix(, data = xx) #placeholder data
-
-x=x[,2:ncol(x)] #omit the intercept -run on demeaned data without one
-
-y =  #define Y
   
 ################################
 # LASSO
 ################################
-
-grid = 10^seq(10, -2, length = 500) # we can just remove this to use their default grid, this is a logarithmic grid
-lasso.mod <- glmnet(x[train,], y[train], alpha = 1, lambda = grid)
+lasso.mod <- glmnet(x[train,], y[train], alpha = 1)
 plot(lasso.mod) #this allows you to plot coefficients as a function of your L1-budget (and hence lambda)
 
 #This is may be useful to see how and where shrinkage kicks in.
-cv.out10u = cv.glmnet(x[train,], y[train], alpha = 1, lambda=grid)
+cv.out10u = cv.glmnet(x[train,], y[train], alpha = 1)
 plot(cv.out10u)
-plot(cv.out10u$lambda,cv.out10u$cvm, main="10-fold CV user-defined grid", xlab="Lambda", ylab="CV MSE")
+plot(cv.out10u$lambda,cv.out10u$cvm, main="10-fold CV", xlab="Lambda", ylab="CV MSE")
 
 bestlam10u = cv.out10u$lambda.min
 lasso.pred <- predict(lasso.mod, s = bestlam10u, newx = x[test,])
@@ -87,8 +84,8 @@ MSEpl
 
 # Function to run Elastic Net on multiple alphas
 run_elastic_net <- function(alpha_val) {
-  elnet.mod <- glmnet(x[train,], y[train], alpha = alpha_val, lambda = grid)
-  cv.out10el = cv.glmnet(x[train,], y[train], alpha = alpha_val, lambda = grid)
+  elnet.mod <- glmnet(x[train,], y[train], alpha = alpha_val)
+  cv.out10el = cv.glmnet(x[train,], y[train], alpha = alpha_val)
   
   plot(cv.out10el$lambda, cv.out10el$cvm, main = paste("CV for alpha =", alpha_val), xlab = "Lambda", ylab = "CV MSE")
   
@@ -107,12 +104,14 @@ for (i in seq_along(results)) {
   cat(paste("Elastic Net with alpha =", alpha_values[i], "-> Best Lambda:", results[[i]]$best_lambda, ", MSE:", results[[i]]$mse, "\n"))
 }
 
+# Elastic Net with alpha = 0.9 -> Best Lambda: 2.40465794564183e-05 , MSE: 1.7853529881859e-07 
+mse_elasticnet = 1.7853529881859e-07 
 #################################
 # Principal components regression
 ##################################
 
 #Examine the fit syntax:
-pcr.fit=pcr(y~.,data=, subset=train, scale=TRUE, validation="CV")
+pcr.fit=pcr(y~.,data=data_clean, subset=train, scale=TRUE, validation="CV")
 
 #Summary of CV results and variance shares explained by components
 summary(pcr.fit)
@@ -133,13 +132,31 @@ mse_pcr = MSE(pcr.pred,y[test])
 ##########################################
 # Principal components regression + LASSO
 ##########################################
-
 comps.mat=pcr.fit$scores
 cv.out = cv.glmnet(comps.mat, y[train], alpha = 1) #determine lambda.min and lambda.1SE
 lasso.mod <- glmnet(comps.mat, y[train], alpha = 1, lambda = cv.out$lambda.1se)
 lasso.mod$beta #check the coefficients
 
 # predict with the LASSO model using PCR components as input
-comps.test <- predict(pcr.pred, newdata = x[test, ]) 
+# Attempt to extract components, ensuring it maintains a matrix structure
+comps.test <- pcr.pred[, , 1]  # If this gives NULL, try the following:
+comps.test <- matrix(pcr.pred[, , 1], nrow = dim(pcr.pred)[1], ncol = dim(pcr.pred)[3])  # Convert it to a 2D matrix
 yhat.lasso_pcr <- predict(lasso.mod, newx = comps.test)
 mse_lasso_pcr_cv = MSE(yhat.lasso_pcr, y[test])
+
+# Append results to the data frame
+mse_results <- data.frame(
+  Model = character(),
+  MSE = numeric(),
+  stringsAsFactors = FALSE
+)
+
+mse_results <- rbind(mse_results, 
+                     data.frame(Model = "LASSO CV", MSE = mse_lasso_cv),
+                     data.frame(Model = "LASSO plugin", MSE = mse_plugin_LASSO),
+                     data.frame(Model = "LASSO + PCR", MSE = mse_lasso_pcr_cv),
+                     data.frame(Model = "POST LASSO", MSE = MSEpl),
+                     data.frame(Model = "PCR", MSE = mse_pcr))
+
+# View the results
+print(mse_results)
