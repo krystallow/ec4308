@@ -3,8 +3,13 @@ library(tictoc)
 library(glmnet)
 library(tree)
 library(rpart)
+library(readxl)
 
-# df=Credit
+Transformed_Dataset <- read_excel("~/Library/Mobile Documents/com~apple~CloudDocs/YEAR 4/Semester 1/EC4308/Project/ec4308-project/Transformed_Dataset.xlsx")
+
+df <- Transformed_Dataset
+df <- df[-1, ]
+
 set.seed(2457829)
 ntrain <- floor(0.7 * nrow(df))  # take 70% train
 tr = sample(1:nrow(df),ntrain)  
@@ -12,8 +17,8 @@ train = df[tr,]
 test = df[-tr,]  
 
 ## CHANGE
-target_column <- ""
-others_columns <- c("")
+target_column <- "INDPRO"
+others_columns <- c("sasdate")
 formula <- as.formula(paste(target_column, "~ . -", paste(others_columns, collapse = " - ")))
 # formula <- Balance ~ . -ID
 # target_column = "Balance"
@@ -24,7 +29,7 @@ num_params = ncol(train)-1
 ######## Best Subset Selection >> method = exhaustive ###
 ##########################################################
 tic("Best Subset Selection")
-best_subset_model <- regsubsets(formula, data = train, nvmax = ncol(train)-1, method = "exhaustive")
+best_subset_model <- regsubsets(formula, data = train, nvmax = ncol(train)-1, method = "exhaustive", really.big = TRUE)
 toc()
 
 summary_bss <- summary(best_subset_model)
