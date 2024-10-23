@@ -539,7 +539,7 @@ mse_pruned_tree <- mse(pred_pruned_tree, test[[target_column]])
 
 
 ## Saving Dataframe for variables selected by Best Model > Backward Selection:
-selected_columns <- c(varselcv[-1])  # Combine the target variable with selected variables
+selected_columns <- names(temp.coef_cv)[-1] 
 variables_selected <- df[, selected_columns]  # Select the relevant columns
 write.csv(variables_selected, file = "variables_selected.csv", row.names = FALSE)
 
