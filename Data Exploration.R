@@ -7,6 +7,7 @@ library(writexl)
 library(tidyr)
 
 # Loading datasets
+Pre <- read_excel("Pre_Dataset.xlsx")[-1,]
 Pre_Dataset <- read_excel("Pre_Dataset.xlsx")[-1,-1]
 Pre_Dataset <- Pre_Dataset %>%
   mutate(across(everything(), ~ ifelse(is.na(.), 0, .)))
@@ -101,17 +102,29 @@ write_xlsx(as.data.frame(descriptive_table), "descriptive_table.xlsx")
 ####################################################
 ######### 4. Trends of INDPRO/ X-variables ######### 
 ####################################################
-pre_with_columns <- read_excel("Pre_Dataset.xlsx")[-1,]
-subset_data <- pre_with_columns[, c("sasdate", "INDPRO", "DPCERA3M086SBEA", "RPI", "IPFINAL", "CMRMTSPLx", "PAYEMS", "UNRATE", "CUMFNS", "BAA", "AAA", "RETAILx", "MANEMP")]  
-filtered_data <-subset_data %>%
-  pivot_longer(cols = -sasdate, names_to = "Indicator", values_to = "Value")
+Pre <- read_excel("Pre_Dataset.xlsx")[-1,]
+Pre$sasdate <- as.Date(as.numeric(Pre$sasdate), origin = "1899-12-30")
+Pre$sasdate <- as.Date(Pre$sasdate, format = "%Y-%d-%m")
+Pre$sasdate <- gsub("^(\\d{4})-(\\d{2})-(\\d{2})$", "\\1-\\3-\\2", Pre$sasdate)
+Pre$sasdate <- as.Date(Pre$sasdate, format = "%Y-%m-%d")
+subset_data <- Pre[, c("sasdate", "INDPRO", "DPCERA3M086SBEA", "RPI", "IPFINAL", "CMRMTSPLx", "PAYEMS", "UNRATE", "CUMFNS", "BAA", "AAA", "RETAILx", "MANEMP")]  
 
-# Create the stacked plots using ggplot2
-ggplot(filtered_data, aes(x = Date, y = Value, color = dates)) +
-  geom_line(size = 1) +  # Create a line plot with different colors for each indicator
-  facet_wrap(~ dates, scales = "free_y", ncol = 1) +  # Stack the plots vertically
-  theme_minimal() +  # Apply a minimal theme for cleaner visuals
-  labs(title = "Trends of Indicators Over Time", x = "Date", y = "Value") +
-  theme(legend.position = "none")  # Remove the legend as each plot is labeled individually
+# Plot INDPRO 
+ggplot(subset_data, aes(x = sasdate, y = INDPRO)) +
+  geom_line(color = "blue") +
+  labs(title = "INDPRO over Time", x = "Year", y = "INDPRO") +
+  theme_minimal()
 
-#need to fix the dates first
+# Get column names of the indicators you want to plot excluding date
+indicators <- names(subset_data)[!names(subset_data) %in% "sasdate"]
+# Plotting the other indicators
+for (indicator in indicators) {
+  p <- ggplot(Pre, aes(x = sasdate, y = .data[[indicator]])) +
+    geom_line() +
+    labs(title = paste(indicator, "over Time"), x = "Year", y = indicator) +
+    theme_minimal()
+  
+  print(p)
+}
+
+
