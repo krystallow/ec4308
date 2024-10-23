@@ -1,6 +1,7 @@
 library(glmnet)
 library(hdm)
 library(pls)
+library(readxl)
 
 set.seed(2457829)
 data <- read_excel("Transformed_Dataset.xlsx", range = "B1:DA775")
@@ -12,6 +13,8 @@ y = data_clean$INDPRO
 ntrain= floor(0.7* 773)  #number of training data -> 70% of total obs
 train = sample(1:nrow(x),ntrain)
 test = (-train)
+training_set = data_clean[train,]
+testing_set = data_clean[-train,]
 MSE <- function(pred, truth){
   return(mean((truth - pred)^2)) 
 }
@@ -171,3 +174,26 @@ mse_results <- rbind(mse_results,
 
 # View the results
 print(mse_results)
+
+###########
+# Bagging
+###########
+library(randomForest)
+baggingfit = randomForest(y[train]~.,data=training_set,ntree=5000, mtry=104)
+plot(baggingfit) #plot the last fitted (largest) OOB error
+bagging_prediction = predict(baggingfit)
+
+################
+# Random Forest
+################
+
+rffit = randomForest(y[train]~.,data=training_set,ntree=5000)
+plot(rffit) #plot the last fitted (largest) OOB error
+rf_prediction = predict(rffit)
+
+
+
+
+
+
+
