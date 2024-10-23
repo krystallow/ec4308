@@ -5,6 +5,7 @@ library(tree)
 library(rpart)
 library(caret)
 library(readxl)
+library(gbm)
 
 Transformed_Dataset <- read_excel("Transformed_Dataset.xlsx")
 
@@ -26,7 +27,7 @@ formula <- as.formula(paste(target_column, "~.-", paste(others_columns, collapse
 num_params = ncol(train)-1
 
 ##########################################################
-######## Best Subset Selection >> method = exhaustive ###
+######## Best Subset Selection >> method = exhaustive ### >> Not Ran, too long run time
 ##########################################################
 tic("Best Subset Selection")
 best_subset_model <- regsubsets(formula, data = train, nvmax = ncol(train)-1, method = "exhaustive", really.big = TRUE)
@@ -156,32 +157,55 @@ kbiclf=which.min(BICLf) #BIC choice
 
 kaiclf=which.min(AICLf)  #AIC choice, same
 
+
+#######################################
 #AIC and BIC using iterative procedure
-## Calculate OOS MSE using AIC and BIC Minimizing models:
-#Get the X-matrix for the test set:
-complete_cases <- complete.cases(test) ## for dropped NA rows
-test <- test[complete_cases, ]
-test.mat <- test.mat[complete_cases, ]
+#######################################
+sig0=var(train$INDPRO)
+BIC0f = sumbfs$rss/ntrain + log(ntrain)*sig0*((seq(1,11,1))/ntrain)
+AIC0f = sumbfs$rss/ntrain + 2*sig0*((seq(1,11,1))/ntrain)
 
-test.mat = model.matrix(formula, data = test)
+k0bicf = which.min(BIC0f)
+k0aicf = which.min(AIC0f)
 
-#extract coefficients from the best model on BIC
+BIC1f = sumbfs$rss/ntrain + log(ntrain)*(sumbfs$rss[k0bicf]/(ntrain-k0bicf-1))*((seq(1,11,1))/ntrain)
+AIC1f = sumbfs$rss/ntrain + 2*(sumbfs$rss[k0aicf]/(ntrain-k0aicf-1))*((seq(1,11,1))/ntrain)
+
+k1bicf = which.min(BIC1f)
+k1aicf = which.min(AIC1f)
+
+BIC2f = sumbfs$rss/ntrain + log(ntrain)*(sumbfs$rss[k1bicf]/(ntrain-k1bicf-1))*((seq(1,11,1))/ntrain)
+AIC2f = sumbfs$rss/ntrain + 2*(sumbfs$rss[k1aicf]/(ntrain-k1aicf-1))*((seq(1,11,1))/ntrain)
+
+k2bicf = which.min(BIC2f)
+k2aicf = which.min(AIC2f)
+#See here we can stop after two steps (i.e., with BIC1/AIC1 - the choice converges to 4 parameters)
+
+
+## Calculate OOS MSE using AIC and BIC Minimizing models
+
 temp.coef = coef(bfssel, id = kbicf)
-MSEBICf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+MSEBICf = mean((test$INDPRO-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
-varselbic = names(temp.coef)  # Selected variables on BIC
+varselbicf = names(temp.coef)  # Selected variables on BIC
 
-#Repeat this for AIC >> check if all agree/same
 temp.coef = coef(bfssel, id = kaicf)
-MSEAICf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+MSEAICf = mean((test$INDPRO-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 varselaic = names(temp.coef)  # Selected variables on AIC
 
 temp.coef = coef(bfssel, id = kbiclf)
-MSEBICLf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+MSEBICLf = mean((test$INDPRO-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 temp.coef = coef(bfssel, id = kaiclf)
-MSEAICfL = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+MSEAICLf = mean((test$INDPRO-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+
+temp.coef = coef(bfssel, id = k1bicf)
+MSEBIC1f = mean((test$INDPRO-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+
+temp.coef = coef(bfssel, id = k1aicf)
+MSEAIC1f = mean((test$INDPRO-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+
 
 
 ##########################################
@@ -359,7 +383,6 @@ cat("Variables selected by CV:\n", varsel_cv, "\n")
 cat("Coefficients for CV-selected model:\n", temp.coef_cv, "\n")
 
 
-
 #############
 ### Ridge ###
 #############
@@ -387,7 +410,6 @@ if (all(tr <= nrow(x))) {
 MSE <- function(pred, truth){ 
   return(mean((truth - pred)^2))
 }
-
 
 ## Choose Lambda by 10-fold CV with auto defined grid:
 cv.out10d = cv.glmnet(x[tr,], y[tr], alpha = 0) 
@@ -471,8 +493,20 @@ big_tree <- tree(formula, data=train, mindev=0.0001) ## change mindev for depth 
 # Check the number of leaves in the big tree
 length(unique(big_tree$where))
 
+# Perform cross-validation to find the optimal tree size
+cv_result <- cv.tree(big_tree, FUN = prune.tree)
+
+# Plot the cross-validated error as a function of the tree size (number of terminal nodes)
+plot(cv_result$size, cv_result$dev, type = "b", col = "blue", 
+     xlab = "Number of Terminal Nodes", ylab = "Cross-Validated Deviance", 
+     main = "Cross-Validation for Tree Pruning")
+
+# Find the optimal tree size based on the minimum cross-validated error
+optimal_size <- cv_result$size[which.min(cv_result$dev)]
+
+
 # Prune the tree to the optimal size
-pruned_tree <- prune.tree(big_tree, best=7) ## change best, see the shape of tree first to prune
+pruned_tree <- prune.tree(big_tree, best=optimal_size) ## change best, see the shape of tree first to prune
 
 # Check the pruned tree size
 length(unique(pruned_tree$where))
@@ -500,4 +534,9 @@ mse <- function(pred, truth) {
 
 mse_big_tree <- mse(pred_big_tree, test[[target_column]])
 mse_pruned_tree <- mse(pred_pruned_tree, test[[target_column]])
+
+
+
+## Saving Dataframe for variables selected by Best Model:
+
 
