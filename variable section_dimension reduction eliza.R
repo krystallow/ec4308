@@ -4,7 +4,7 @@ library(pls)
 library(readxl)
 
 set.seed(2457829)
-data <- read_excel("Transformed_Dataset.xlsx", range = "B1:DA775")
+data <- read_excel("Final_Transformed_Dataset.xlsx", range = "B1:DK775")
 data = data[-1,]
 data_clean <- na.omit(data)
 # Now create model matrix
