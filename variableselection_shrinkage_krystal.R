@@ -310,6 +310,7 @@ kaiclb=which.min(AICLb)  #AIC choice, same
 
 #AIC and BIC using iterative procedure
 ## Calculate OOS MSE using AIC and BIC Minimizing models:
+test.mat = model.matrix(formula, data = test)
 temp.coef = coef(bbssel, id = kbicb)
 MSEBICb = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
@@ -540,7 +541,7 @@ mse_pruned_tree <- mse(pred_pruned_tree, test[[target_column]])
 
 
 ## Saving Dataframe for variables selected by Best Model > Backward Selection:
-selected_columns <- c("INDPRO", varselcv[-1])  # Combine the target variable with selected variables
+selected_columns <- c(varselcv[-1])  # Combine the target variable with selected variables
 variables_selected <- df[, selected_columns]  # Select the relevant columns
 write.csv(variables_selected, file = "variables_selected.csv", row.names = FALSE)
 
