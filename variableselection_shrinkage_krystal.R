@@ -7,7 +7,9 @@ library(caret)
 library(readxl)
 library(gbm)
 
-Transformed_Dataset <- read_excel("Transformed_Dataset.xlsx")
+Transformed_Dataset <- read_excel("Final_Transformed_Dataset.xlsx")
+Transformed_Dataset <- na.omit(read_excel("Final_Transformed_Dataset.xlsx"))
+
 
 df <- Transformed_Dataset
 df <- df[-1, ]
@@ -183,9 +185,9 @@ k2aicf = which.min(AIC2f)
 
 
 ## Calculate OOS MSE using AIC and BIC Minimizing models
-
+test.mat = model.matrix(formula, data = test)
 temp.coef = coef(bfssel, id = kbicf)
-MSEBICf = mean((test$INDPRO-test.mat[,names(temp.coef)]%*%temp.coef)^2)
+MSEBICf = mean((test[[target_column]]-test.mat[,names(temp.coef)]%*%temp.coef)^2)
 
 varselbicf = names(temp.coef)  # Selected variables on BIC
 
@@ -537,6 +539,9 @@ mse_pruned_tree <- mse(pred_pruned_tree, test[[target_column]])
 
 
 
-## Saving Dataframe for variables selected by Best Model:
+## Saving Dataframe for variables selected by Best Model > Backward Selection:
+selected_columns <- c("INDPRO", varselcv[-1])  # Combine the target variable with selected variables
+variables_selected <- df[, selected_columns]  # Select the relevant columns
+write.csv(variables_selected, file = "variables_selected.csv", row.names = FALSE)
 
 
