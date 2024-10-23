@@ -113,3 +113,5 @@ ggplot(filtered_data, aes(x = Date, y = Value, color = dates)) +
   theme_minimal() +  # Apply a minimal theme for cleaner visuals
   labs(title = "Trends of Indicators Over Time", x = "Date", y = "Value") +
   theme(legend.position = "none")  # Remove the legend as each plot is labeled individually
+
+#need to fix the dates first
