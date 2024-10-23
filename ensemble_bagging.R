@@ -43,7 +43,7 @@ for(i in 1:nset) {
   fmat[,i] = predict(boostfit,n.trees=ntreev[i])
 }
 
-
+boosting_pred <- predict(boostfit)
 #Plot the fits:
 windows()
 par(mfrow=c(1,3))
@@ -62,7 +62,7 @@ for(i in 1:nset) {
   title(main=paste('boosting, ntree= ',ntreev[i]))
 }
 
-
+boosting_pred <- predict(boostfit)
 
 ###################################################
 ### Ensemble - Boosting for Variable Selection  ### > ON CV
@@ -105,6 +105,7 @@ for(i in 1:nset_cv) {
   fmat[,i] = predict(boostfit_cv,n.trees=ntree_cv[i])
 }
 
+boostingcv_pred <- predict(boostfit_cv)
 
 #Plot the fits:
 windows()
