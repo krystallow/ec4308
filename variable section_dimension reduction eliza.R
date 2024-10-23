@@ -179,7 +179,9 @@ print(mse_results)
 # Bagging
 ###########
 library(randomForest)
-baggingfit = randomForest(y[train]~.,data=training_set,ntree=5000, mtry=104)
+library(readr)
+variables_selected <- read_csv("variables_selected.csv")
+baggingfit = randomForest(y~.,data=variables_selected,ntree=5000, mtry=12)
 plot(baggingfit) #plot the last fitted (largest) OOB error
 bagging_prediction = predict(baggingfit)
 
@@ -187,7 +189,7 @@ bagging_prediction = predict(baggingfit)
 # Random Forest
 ################
 
-rffit = randomForest(y[train]~.,data=training_set,ntree=5000)
+rffit = randomForest(y~.,data=variables_selected,ntree=5000)
 plot(rffit) #plot the last fitted (largest) OOB error
 rf_prediction = predict(rffit)
 
