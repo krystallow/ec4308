@@ -7,10 +7,8 @@ library(caret)
 library(readxl)
 library(gbm)
 
-Transformed_Dataset <- read_excel("Final_Transformed_Dataset.xlsx")
+
 Transformed_Dataset <- na.omit(read_excel("Final_Transformed_Dataset.xlsx"))
-
-
 df <- Transformed_Dataset
 df <- df[-1, ]
 
