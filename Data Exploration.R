@@ -118,13 +118,24 @@ ggplot(subset_data, aes(x = sasdate, y = INDPRO)) +
 # Get column names of the indicators you want to plot excluding date
 indicators <- names(subset_data)[!names(subset_data) %in% "sasdate"]
 # Plotting the other indicators
+
+library(ggplot2)
+library(gridExtra)
+
+# Create a list to store the plots
+plots <- list()
+
+# Loop through each indicator and generate the plot
 for (indicator in indicators) {
-  p <- ggplot(Pre, aes(x = sasdate, y = .data[[indicator]])) +
+  p <- ggplot(subset_data, aes(x = sasdate, y = .data[[indicator]])) +
     geom_line() +
     labs(title = paste(indicator, "over Time"), x = "Year", y = indicator) +
     theme_minimal()
   
-  print(p)
+  plots[[indicator]] <- p
 }
+
+# Arrange the plots in a grid with 3 rows and 4 columns
+grid.arrange(grobs = plots, nrow = 3, ncol = 4)
 
 
