@@ -224,23 +224,36 @@ prediction_df_bagging <- data.frame(Month = months, Predicted_Values = bagging_p
 ################
 # Random Forest
 ################
-
+library(fanplot)
 rffit = randomForest(y~.,data=variables_selected,ntree=5000)
 plot(rffit) #plot the last fitted (largest) OOB error
 rf_prediction = predict(rffit, newdata = future_variables_selected)
 
-prediction_df_rf <- data.frame(Month = months, Predicted_Values = rf_prediction)
+# Random Forest Fan Chart
+# Simulate multiple scenarios for each month by adding random noise
+set.seed(123)
+num_scenarios <- 100  # Number of scenarios to simulate
+INDPRO = rf_prediction
+predicted_values_matrix <- replicate(num_scenarios, rf_prediction + rnorm(12, 0, 0.002))
+# Convert matrix into time series format
+predicted_values_ts <- ts(predicted_values_matrix, start = c(1, 1), frequency = 12)
+plot(INDPRO, main="Fan Chart for Random Forest", xlim = c(1, 12), ylim = c(-0.02, 0.02))
+fan(predicted_values_ts, data.type = "simulations", 
+    probs = seq(0.1, 0.9, by = 0.1), 
+    fan.col = colorRampPalette(c("blue", "white")))
 
-library(fanplot)
-INDPRO = prediction_df_bagging$Predicted_Values
-plot(INDPRO, main="Fan Chart for Bagging", xlim = c(1, 12), ylim = c(-0.5, 0.5))
-# add fan
-fan(data = prediction_df_bagging,fan.col = colorRampPalette(c("blue", "white"))(9))
-
-INDPRO = prediction_df_rf$Predicted_Values
-plot(INDPRO, main="Fan Chart for Bagging", xlim = c(1, 12), ylim = c(-0.5, 0.5))
-# add fan
-fan(data = prediction_df_rf,fan.col = colorRampPalette(c("blue", "white"))(9))
+# Bagging Fan Chart
+# Simulate multiple scenarios for each month by adding random noise
+set.seed(123)
+num_scenarios <- 100  # Number of scenarios to simulate
+INDPRO = bagging_prediction
+predicted_values_matrix <- replicate(num_scenarios, bagging_prediction + rnorm(12, 0, 0.002))
+# Convert matrix into time series format
+predicted_values_ts <- ts(predicted_values_matrix, start = c(1, 1), frequency = 12)
+plot(INDPRO, main="Fan Chart for Random Forest", xlim = c(1, 12), ylim = c(-0.02, 0.02))
+fan(predicted_values_ts, data.type = "simulations", 
+    probs = seq(0.1, 0.9, by = 0.1), 
+    fan.col = colorRampPalette(c("blue", "white")))
 
 
 
