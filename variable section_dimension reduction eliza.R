@@ -181,21 +181,79 @@ print(mse_results)
 library(randomForest)
 library(readr)
 variables_selected <- read_csv("variables_selected.csv")
+# Simulate future feature data for the next 12 months (e.g., based on historical data or trends)
+future_IPFPNSS <- rnorm(12, mean = mean(variables_selected$IPFPNSS), sd = sd(variables_selected$IPFPNSS))
+future_IPMAT <- rnorm(12, mean = mean(variables_selected$IPMAT), sd = sd(variables_selected$IPMAT))
+future_IPDMAT <- rnorm(12, mean = mean(variables_selected$IPDMAT), sd = sd(variables_selected$IPDMAT))
+future_IPMANSICS <- rnorm(12, mean = mean(variables_selected$IPMANSICS), sd = sd(variables_selected$IPMANSICS))
+future_UNRATE <- rnorm(12, mean = mean(variables_selected$UNRATE), sd = sd(variables_selected$UNRATE))
+future_CES1021000001 <- rnorm(12, mean = mean(variables_selected$CES1021000001), sd = sd(variables_selected$CES1021000001))
+future_AWOTMAN <- rnorm(12, mean = mean(variables_selected$AWOTMAN), sd = sd(variables_selected$AWOTMAN))
+future_CES0600000008 <- rnorm(12, mean = mean(variables_selected$CES0600000008), sd = sd(variables_selected$CES0600000008))
+future_CES3000000008 <- rnorm(12, mean = mean(variables_selected$CES3000000008), sd = sd(variables_selected$CES3000000008))
+future_CIVPART <- rnorm(12, mean = mean(variables_selected$CIVPART), sd = sd(variables_selected$CIVPART))
+future_LNS11300036 <- rnorm(12, mean = mean(variables_selected$LNS11300036), sd = sd(variables_selected$LNS11300036))
+future_FEDFUNDS <- rnorm(12, mean = mean(variables_selected$FEDFUNDS), sd = sd(variables_selected$FEDFUNDS))
+
+# Combine into a future data frame
+future_variables_selected <- data.frame(
+  IPFPNSS = future_IPFPNSS,
+  IPMAT = future_IPMAT,
+  IPDMAT = future_IPDMAT,
+  IPMANSICS = future_IPMANSICS,
+  UNRATE = future_UNRATE,
+  CES1021000001 = future_CES1021000001,
+  AWOTMAN = future_AWOTMAN,
+  CES0600000008 = future_CES0600000008,
+  CES3000000008 = future_CES3000000008,
+  CIVPART = future_CIVPART,
+  LNS11300036 = future_LNS11300036,
+  FEDFUNDS = future_FEDFUNDS
+)
+
+# Create a data frame for 12 months
+months <- paste(1:12)
+future_values <- rep(NA, 12)  # Placeholder for future values
 baggingfit = randomForest(y~.,data=variables_selected,ntree=5000, mtry=12)
 plot(baggingfit) #plot the last fitted (largest) OOB error
-bagging_prediction = predict(baggingfit)
+bagging_prediction = predict(baggingfit, newdata = future_variables_selected)
+
+prediction_df_bagging <- data.frame(Month = months, Predicted_Values = bagging_prediction)
+
 
 ################
 # Random Forest
 ################
-
+library(fanplot)
 rffit = randomForest(y~.,data=variables_selected,ntree=5000)
 plot(rffit) #plot the last fitted (largest) OOB error
-rf_prediction = predict(rffit)
+rf_prediction = predict(rffit, newdata = future_variables_selected)
 
+# Random Forest Fan Chart
+# Simulate multiple scenarios for each month by adding random noise
+set.seed(123)
+num_scenarios <- 100  # Number of scenarios to simulate
+INDPRO = rf_prediction
+predicted_values_matrix <- replicate(num_scenarios, rf_prediction + rnorm(12, 0, 0.002))
+# Convert matrix into time series format
+predicted_values_ts <- ts(predicted_values_matrix, start = c(1, 1), frequency = 12)
+plot(INDPRO, main="Fan Chart for Random Forest", xlim = c(1, 12), ylim = c(-0.02, 0.02))
+fan(predicted_values_ts, data.type = "simulations", 
+    probs = seq(0.1, 0.9, by = 0.1), 
+    fan.col = colorRampPalette(c("blue", "white")))
 
-
-
+# Bagging Fan Chart
+# Simulate multiple scenarios for each month by adding random noise
+set.seed(123)
+num_scenarios <- 100  # Number of scenarios to simulate
+INDPRO = bagging_prediction
+predicted_values_matrix <- replicate(num_scenarios, bagging_prediction + rnorm(12, 0, 0.002))
+# Convert matrix into time series format
+predicted_values_ts <- ts(predicted_values_matrix, start = c(1, 1), frequency = 12)
+plot(INDPRO, main="Fan Chart for Random Forest", xlim = c(1, 12), ylim = c(-0.02, 0.02))
+fan(predicted_values_ts, data.type = "simulations", 
+    probs = seq(0.1, 0.9, by = 0.1), 
+    fan.col = colorRampPalette(c("blue", "white")))
 
 
 
