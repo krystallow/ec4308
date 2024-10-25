@@ -3,7 +3,7 @@
 ################
 
 ################################
-###### p = 9, q = 3 ############ >> With dimension warning
+###### p = 9, q = 3 ############ >> With dimension warning >> Overfit
 ################################
 
 # Load required libraries
@@ -113,7 +113,7 @@ summary(final_model)
 
 
 ############################################
-###### Optimal Lags = 1 for all ############ >> No dimension warning
+###### Optimal Lags = 1 for all ############ >> No dimension warning >> Overfit
 ############################################
 library(readxl)
 library(dynlm)
