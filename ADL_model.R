@@ -2,15 +2,6 @@
 ### ADL Model###
 ################
 
-## Multicollinearity Check##
-correlation_matrix <- cor(x)
-print(correlation_matrix)
-
-# Check VIF values for multicollinearity
-vif_values <- vif(lm(y ~ ., data = df))
-print(vif_values)
-
-
 # Load required libraries
 library(readxl)
 library(dynlm)
@@ -24,6 +15,15 @@ df <- df[, selected_cols]
 
 y <- df$INDPRO
 x <- df[, setdiff(colnames(df), "INDPRO")]
+
+## Multicollinearity Check##
+correlation_matrix <- cor(x)
+print(correlation_matrix)
+
+# Check VIF values for multicollinearity
+vif_values <- vif(lm(y ~ ., data = df))
+print(vif_values)
+
 
 # Define cross-validation function with rolling window
 cv_rmse <- function(p, q, y, x_var, data) {
