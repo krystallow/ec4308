@@ -33,7 +33,7 @@ lapply(names(Pre_Dataset['INDPRO']), function(col) {
 })
 
 #Transformed:
-acf_results_transformed <- lapply(Pre_Dataset['INDPRO'], acf, plot = FALSE)
+acf_results_transformed <- lapply(Transformed_Dataset['INDPRO'], acf, plot = FALSE)
 acf_results_transformed 
 par(mfrow = c(1, 1)) 
 lapply(names(Transformed_Dataset['INDPRO']), function(col) {
