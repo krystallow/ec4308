@@ -51,6 +51,10 @@ rlasso.fit = rlasso(y[train]~x[train,],  post=FALSE)
 yhat.rlasso<- predict(rlasso.fit, newdata=x[test,])
 mse_plugin_LASSO = MSE(yhat.rlasso, y[test])
 
+variables_selected <- colnames(data[, colnames(data) %in% rownames(selected_vars)[-1]])
+variables_selected_df <- data[, variables_selected]
+write.csv(variables_selected_df, file = "lasso_variables_selected.csv", row.names = FALSE)
+
 ################################
 # POST LASSO
 ################################
