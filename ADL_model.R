@@ -378,3 +378,47 @@ adl_formula <- as.formula(adl_formula)
 adl_model <- lm(adl_formula, data = df)
 summary(adl_model)
 
+
+
+## Model validity 
+set.seed(2457829)
+
+train_index <- sample(1:nrow(df), 0.7 * nrow(df))
+train_data <- df[train_index, ]
+test_data <- df[-train_index, ]
+
+# Fit the model on training data
+adl_model_train <- lm(adl_formula, data = train_data)
+
+# Predict on the test data
+predictions <- predict(adl_model_train, newdata = test_data)
+
+# Calculate RMSE (Root Mean Squared Error) for evaluation
+rmse <- sqrt(mean((predictions - test_data$INDPRO)^2))
+cat("RMSE on test data:", rmse)
+
+
+# Residual diagnostics
+par(mfrow = c(2, 2))  # Set up the plotting area for multiple plots
+
+# Plot residuals vs fitted values
+plot(adl_model_train$fitted.values, resid(adl_model_train), 
+     xlab = "Fitted Values", ylab = "Residuals", 
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red")
+
+# Q-Q plot for normality of residuals
+qqnorm(resid(adl_model_train))
+qqline(resid(adl_model_train), col = "red")
+
+# Scale-Location plot
+plot(adl_model_train$fitted.values, sqrt(abs(resid(adl_model_train))), 
+     xlab = "Fitted Values", ylab = "Sqrt of |Residuals|", 
+     main = "Scale-Location")
+abline(h = 0, col = "red")
+
+# Residuals vs Leverage plot
+plot(hatvalues(adl_model_train), resid(adl_model_train), 
+     xlab = "Leverage", ylab = "Residuals", 
+     main = "Residuals vs Leverage")
+abline(h = 0, col = "red")
