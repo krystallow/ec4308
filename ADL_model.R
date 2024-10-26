@@ -336,27 +336,31 @@ summary(final_model)
 #################
 library(readxl)
 library(forecast)
-library(car)
+
+df <- na.omit(read_excel("Final_Transformed_Dataset.xlsx"))
+df <- df[-1, ]  
+selected_variables <- read.csv("variables_selected.csv")
+selected_cols <- c("INDPRO", colnames(selected_variables))
+df <- df[, selected_cols]
+
 
 # optimal lag for INDPRO
 best_model <- auto.arima(df$INDPRO)
 summary(best_model)
 
 optimal_lags <- list()
-
-# loop through each independent variables
 for (var in names(df)[names(df) != "INDPRO"]) {
-  # fit ARIMA model to the independent variable with respect to INDPRO
   model <- auto.arima(df[[var]], xreg = df$INDPRO)
-  
-  # Extract optimal p and q
   p <- model$arma[1]  # AR order
   q <- model$arma[2]  # MA order
   optimal_lags[[var]] <- list(p = p, q = q)
 }
 
-
 adl_formula <- "INDPRO ~"
+#p_indpro <- best_model$arma[1]
+#for (lag in 1:p_indpro) {
+  #adl_formula <- paste(adl_formula, paste0("lag(INDPRO, ", lag, ")"), sep = " + ")
+#}
 
 # Loop through each independent variable to construct the formula
 for (var in names(optimal_lags)) {
