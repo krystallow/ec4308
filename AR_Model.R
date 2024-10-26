@@ -9,16 +9,15 @@ Final_Transformed_Dataset$sasdate <- gsub("^(\\d{4})-(\\d{2})-(\\d{2})$", "\\1-\
 Final_Transformed_Dataset$sasdate <- as.Date(Final_Transformed_Dataset$sasdate, format = "%Y-%m-%d")
 df <- Final_Transformed_Dataset
 
-# Step 1: Find optimal number of lags
+# find optimal number of lags
 ts_data <- ts(df$INDPRO, start = c(1960, 3), frequency = 12)
 
-# Create a dummy variable for the COVID period
+# creating a dummy variable for the COVID period
 df$COVID_Dummy <- ifelse(df$Date >= as.Date("2020-01-01") & df$Date <= as.Date("2020-07-01"), 1, 0)
 # Convert the dummy variable to a time series
 covid_dummy_ts <- ts(df$COVID_Dummy, start = c(1960, 3), frequency = 12)
 
-
-# Function to calculate LOOCV for AR models including exogenous regressors (COVID dummy)
+# function to calculate LOOCV for AR models including exogenous regressors (COVID dummy)
 loocv_mse_with_dummy <- function(ts_data, covid_dummy_ts, max_lag) {
   mse_per_lag <- numeric(max_lag)
   
@@ -52,3 +51,10 @@ loocv_mse_with_dummy <- function(ts_data, covid_dummy_ts, max_lag) {
 optimal_lag_with_dummy <- loocv_mse_with_dummy(ts_data, covid_dummy_ts, max_lag = 8)
 print(paste("Optimal Lag with Dummy:", optimal_lag_with_dummy))
 
+optimal_lag <- optimal_lag_with_dummy
+fit <- Arima(ts_data, order = c(optimal_lag, 0, 0), xreg = covid_dummy_ts)
+future_covid_dummy <- rep(0, 12)  
+forecasted_values <- forecast(fit, h = 12, xreg = future_covid_dummy)
+print(forecasted_values)
+plot(forecasted_values, main = "12-Step Forecast with COVID Dummy", 
+     xlab = "Year", ylab = "INDPRO", xlim = c(2019, 2026))
