@@ -244,7 +244,7 @@ for (var in colnames(x)) {
   best_results <- rbind(best_results, data.frame(variable = var, best_q = best_q, best_rmse = best_rmse))
 }
 
-print(best_results)
+yurhhyuprint(best_results)
 
 # Construct final formula based on best p for y and best q for each predictor
 formula_str <- paste("INDPRO ~ L(INDPRO,", best_p, ") + ",  
@@ -254,3 +254,88 @@ formula_str <- paste("INDPRO ~ L(INDPRO,", best_p, ") + ",
 final_model <- dynlm(as.formula(formula_str), data = df)
 summary(final_model)
 
+
+
+############################################
+###### Optimal Lags = 1 for all ############ >>> AIC
+############################################
+library(readxl)
+library(dynlm)
+library(car)
+
+# Read and preprocess the data
+df <- na.omit(read_excel("Final_Transformed_Dataset.xlsx"))
+df <- df[-1, ]   
+selected_variables <- read.csv("variables_selected.csv")
+selected_cols <- c("INDPRO", colnames(selected_variables))
+df <- df[, selected_cols]
+
+# Function to iteratively remove variables with high VIF
+remove_multicollinear <- function(data, vif_threshold = 5) {
+  repeat {
+    vif_values <- vif(lm(INDPRO ~ ., data = data))
+    max_vif <- max(vif_values)
+    if (max_vif < vif_threshold) break
+    var_to_remove <- names(vif_values)[which.max(vif_values)]
+    data <- data[, !colnames(data) %in% var_to_remove]
+  }
+  return(data)
+}
+
+# Apply multicollinearity check
+df <- remove_multicollinear(df)
+print("VIF check complete; remaining variables:")
+print(names(df))
+
+# Define the target (y) and predictor (x) variables
+y <- "INDPRO"
+x_vars <- setdiff(colnames(df), y)
+
+# Function to find optimal lag p for the dependent variable using AIC
+aic_single <- function(p, y, data) {
+  formula_str <- paste(y, "~ L(", y, ", ", p, ")", sep = "")
+  model <- try(dynlm(as.formula(formula_str), data = data), silent = TRUE)
+  if (inherits(model, "try-error")) return(Inf)  # Return a large value if the model fails
+  aic_value <- AIC(model)
+  cat("p =", p, "AIC =", aic_value, "\n")  # Debugging output
+  return(aic_value)
+}
+
+# Find optimal lag p for the dependent variable
+p_range <- 1:6
+p_aic_values <- sapply(p_range, function(p) aic_single(p, y, df))
+best_p <- p_range[which.min(p_aic_values)]
+cat("Best lag p for y:", best_p, "\n")
+
+# Function to find optimal q lag for each predictor while holding best_p constant using AIC
+aic_single_q <- function(p, q, y, x_var, data) {
+  formula_str <- paste(y, "~ L(", y, ", ", p, ") + L(", x_var, ", ", q, ")", sep = "")
+  model <- try(dynlm(as.formula(formula_str), data = data), silent = TRUE)
+  if (inherits(model, "try-error")) return(Inf)  # Return a large value if the model fails
+  aic_value <- AIC(model)
+  cat("p =", p, "q =", q, "AIC =", aic_value, "\n")  # Debugging output
+  return(aic_value)
+}
+
+# Loop to find best q lag for each independent variable
+best_results <- data.frame(variable = character(), best_q = numeric(), best_aic = numeric(), stringsAsFactors = FALSE)
+
+for (var in x_vars) {
+  q_aic_values <- sapply(1:4, function(q) aic_single_q(best_p, q, y, var, df))
+  best_q <- 1:4[which.min(q_aic_values)]
+  best_aic <- min(q_aic_values, na.rm = TRUE)
+  best_results <- rbind(best_results, data.frame(variable = var, best_q = best_q, best_aic = best_aic))
+}
+
+print("Best lag q for each variable:")
+print(best_results)
+
+# Construct final formula based on optimal lags for y and each predictor
+formula_str <- paste(y, "~ L(", y, ",", best_p, ")", sep = "")
+for (i in seq_along(best_results$variable)) {
+  formula_str <- paste(formula_str, "+ L(", best_results$variable[i], ",", best_results$best_q[i], ")", sep = "")
+}
+
+# Fit the final model using the best lag structure
+final_model <- try(dynlm(as.formula(formula_str), data = df), silent = TRUE)
+summary(final_model)
