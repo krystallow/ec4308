@@ -6,7 +6,6 @@
 ###### p = 9, q = 3 ############ >> With dimension warning >> Overfit
 ################################
 
-# Load required libraries
 library(readxl)
 library(dynlm)
 library(car)
@@ -74,7 +73,6 @@ for (p in p_range) {
   p_results$rmse[p_results$p == p] <- rmse_value
 }
 
-# Identify best p for y
 best_p_index <- which.min(p_results$rmse)
 best_p <- p_results$p[best_p_index]
 cat("Best lag p for y:", best_p, "\n")
@@ -100,7 +98,6 @@ for (var in colnames(x)) {
 
 print(best_results)
 
-# Construct final formula based on best p for y and best q for each predictor
 formula_str <- paste("y ~ L(y,", best_p, ") + ", 
                      paste(mapply(function(var, q) paste0("L(", var, ",", q, ")"), 
                                   best_results$variable, best_results$best_q), collapse = " + "))
@@ -119,7 +116,6 @@ library(readxl)
 library(dynlm)
 library(car)
 
-# Read and preprocess the data
 df <- na.omit(read_excel("Final_Transformed_Dataset.xlsx"))
 df <- df[-1, ]   
 selected_variables <- read.csv("variables_selected.csv")
@@ -180,7 +176,6 @@ best_results <- data.frame(variable = character(), best_q = numeric(), best_rmse
 p_range <- 1:6  # Dependent variable lag
 q_range <- 1:4   # Independent variable lags
 
-# Find the optimal lag p for the dependent variable (y)
 p_results <- data.frame(p = p_range, rmse = NA)
 
 for (p in p_range) { 
@@ -188,7 +183,7 @@ for (p in p_range) {
   p_results$rmse[p_results$p == p] <- rmse_value
 }
 
-# Identify best p for y
+
 best_p_index <- which.min(p_results$rmse)
 best_p <- p_results$p[best_p_index]
 cat("Best lag p for y:", best_p, "\n")
@@ -244,9 +239,8 @@ for (var in colnames(x)) {
   best_results <- rbind(best_results, data.frame(variable = var, best_q = best_q, best_rmse = best_rmse))
 }
 
-yurhhyuprint(best_results)
+print(best_results)
 
-# Construct final formula based on best p for y and best q for each predictor
 formula_str <- paste("INDPRO ~ L(INDPRO,", best_p, ") + ",  
                      paste(mapply(function(var, q) paste0("L(", var, ",", q, ")"),  
                                   best_results$variable, best_results$best_q), collapse = " + "))
@@ -263,14 +257,12 @@ library(readxl)
 library(dynlm)
 library(car)
 
-# Read and preprocess the data
 df <- na.omit(read_excel("Final_Transformed_Dataset.xlsx"))
 df <- df[-1, ]   
 selected_variables <- read.csv("variables_selected.csv")
 selected_cols <- c("INDPRO", colnames(selected_variables))
 df <- df[, selected_cols]
 
-# Function to iteratively remove variables with high VIF
 remove_multicollinear <- function(data, vif_threshold = 5) {
   repeat {
     vif_values <- vif(lm(INDPRO ~ ., data = data))
@@ -301,7 +293,6 @@ aic_single <- function(p, y, data) {
   return(aic_value)
 }
 
-# Find optimal lag p for the dependent variable
 p_range <- 1:6
 p_aic_values <- sapply(p_range, function(p) aic_single(p, y, df))
 best_p <- p_range[which.min(p_aic_values)]
@@ -330,12 +321,10 @@ for (var in x_vars) {
 print("Best lag q for each variable:")
 print(best_results)
 
-# Construct final formula based on optimal lags for y and each predictor
 formula_str <- paste(y, "~ L(", y, ",", best_p, ")", sep = "")
 for (i in seq_along(best_results$variable)) {
   formula_str <- paste(formula_str, "+ L(", best_results$variable[i], ",", best_results$best_q[i], ")", sep = "")
 }
 
-# Fit the final model using the best lag structure
 final_model <- try(dynlm(as.formula(formula_str), data = df), silent = TRUE)
 summary(final_model)
