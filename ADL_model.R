@@ -3,7 +3,7 @@
 ################
 
 ################################
-###### p = 9, q = 3 ############ >> With dimension warning >> Overfit
+###### Optimal p = 9, q = 3 ############ >> With dimension warning >> Overfit
 ################################
 
 library(readxl)
@@ -328,3 +328,49 @@ for (i in seq_along(best_results$variable)) {
 
 final_model <- try(dynlm(as.formula(formula_str), data = df), silent = TRUE)
 summary(final_model)
+
+
+
+#################
+################# >> Using autoARIMA()
+#################
+library(readxl)
+library(forecast)
+library(car)
+
+# optimal lag for INDPRO
+best_model <- auto.arima(df$INDPRO)
+summary(best_model)
+
+optimal_lags <- list()
+
+# loop through each independent variables
+for (var in names(df)[names(df) != "INDPRO"]) {
+  # fit ARIMA model to the independent variable with respect to INDPRO
+  model <- auto.arima(df[[var]], xreg = df$INDPRO)
+  
+  # Extract optimal p and q
+  p <- model$arma[1]  # AR order
+  q <- model$arma[2]  # MA order
+  optimal_lags[[var]] <- list(p = p, q = q)
+}
+
+
+adl_formula <- "INDPRO ~"
+
+# Loop through each independent variable to construct the formula
+for (var in names(optimal_lags)) {
+  p <- optimal_lags[[var]]$p
+  q <- optimal_lags[[var]]$q
+  
+  # Add terms for the independent variable with the specified lags
+  for (lag in 1:p) {
+    adl_formula <- paste(adl_formula, paste0("lag(", var, ", ", lag, ")"), sep = " + ")
+  }
+}
+
+adl_formula <- as.formula(adl_formula)
+
+adl_model <- lm(adl_formula, data = df)
+summary(adl_model)
+
