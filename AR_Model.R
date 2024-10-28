@@ -1,60 +1,201 @@
-library(forecast)
-library(tseries)
-library(plotly)
-library(readxl)
-Final_Transformed_Dataset <- read_excel("Final_Transformed_Dataset.xlsx")[-1,c(1,2)]
-Final_Transformed_Dataset$sasdate <- as.Date(as.numeric(Final_Transformed_Dataset$sasdate), origin = "1899-12-30")
-Final_Transformed_Dataset$sasdate <- as.Date(Final_Transformed_Dataset$sasdate, format = "%Y-%d-%m")
-Final_Transformed_Dataset$sasdate <- gsub("^(\\d{4})-(\\d{2})-(\\d{2})$", "\\1-\\3-\\2", Final_Transformed_Dataset$sasdate)
-Final_Transformed_Dataset$sasdate <- as.Date(Final_Transformed_Dataset$sasdate, format = "%Y-%m-%d")
-df <- Final_Transformed_Dataset
+# Install and load necessary libraries
+required_packages <- c("forecast", "dplyr", "dynlm", "ggplot2", "plotly")
 
-# find optimal number of lags
-ts_data <- ts(df$INDPRO, start = c(1960, 3), frequency = 12)
-
-# creating a dummy variable for the COVID period
-df$COVID_Dummy <- ifelse(df$Date >= as.Date("2020-01-01") & df$Date <= as.Date("2020-07-01"), 1, 0)
-# Convert the dummy variable to a time series
-covid_dummy_ts <- ts(df$COVID_Dummy, start = c(1960, 3), frequency = 12)
-
-# function to calculate LOOCV for AR models including exogenous regressors (COVID dummy)
-loocv_mse_with_dummy <- function(ts_data, covid_dummy_ts, max_lag) {
-  mse_per_lag <- numeric(max_lag)
-  
-  for (lag in 1:max_lag) {
-    errors <- numeric(length(ts_data) - lag)
-    
-    for (i in (lag + 1):length(ts_data)) {
-      train_set <- ts_data[1:(i - 1)]
-      train_dummy <- covid_dummy_ts[1:(i - 1)]  # Corresponding dummy variables
-      
-      # Fit AR model with the specified lag and COVID dummy as an exogenous regressor
-      fit <- try(Arima(train_set, order = c(lag, 0, 0), xreg = train_dummy), silent = TRUE)
-      
-      if (!inherits(fit, "try-error")) {
-        forecasted_value <- forecast(fit, h = 1, xreg = covid_dummy_ts[i])$mean
-        actual_value <- ts_data[i]
-        errors[i - lag] <- (forecasted_value - actual_value)^2
-      } else {
-        errors[i - lag] <- NA
-      }
-    }
-    
-    mse_per_lag[lag] <- mean(errors, na.rm = TRUE)
-  }
-  
-  optimal_lag <- which.min(mse_per_lag)
-  return(optimal_lag)
+# Check for missing packages and install them
+new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
+if (length(new_packages)) {
+  install.packages(new_packages)
 }
 
-# Find the optimal lag including the COVID dummy variable (testing up to lag 8)
-optimal_lag_with_dummy <- loocv_mse_with_dummy(ts_data, covid_dummy_ts, max_lag = 8)
-print(paste("Optimal Lag with Dummy:", optimal_lag_with_dummy))
+# Load the libraries
+library(forecast)
+library(dplyr)
+library(dynlm)
+library(ggplot2)
+library(plotly)
 
-optimal_lag <- optimal_lag_with_dummy
-fit <- Arima(ts_data, order = c(optimal_lag, 0, 0), xreg = covid_dummy_ts)
-future_covid_dummy <- rep(0, 12)  
-forecasted_values <- forecast(fit, h = 12, xreg = future_covid_dummy)
-print(forecasted_values)
-plot(forecasted_values, main = "12-Step Forecast with COVID Dummy", 
-     xlab = "Year", ylab = "INDPRO", xlim = c(2019, 2026))
+# Set parameters
+csv_file_path <- "Final_Transformed_Dataset.csv"
+target_var <- "INDPRO"
+# x_vars <- c("IPFPNSS", "IPMAT", "IPDMAT", "IPMANSICS", "UNRATE",
+#             "CES1021000001", "AWOTMAN", "CES0600000008",
+#             "CES3000000008", "CIVPART", "LNS11300036", "FEDFUNDS", "COVID_Dummy")
+x_vars <- "COVID_Dummy"
+max_lags <- 12
+forecast_steps <- 12
+
+# Load the CSV file
+df <- read.csv(csv_file_path, stringsAsFactors = FALSE)
+
+# Convert 'sasdate' column to Date format
+df$sasdate <- as.Date(df$sasdate, format = "%m/%d/%Y")
+
+# Fill null values in numeric columns with the mean of those columns
+for (col in names(df)) {
+  if (is.numeric(df[[col]])) {
+    mean_value <- mean(df[[col]], na.rm = TRUE)
+    df[[col]][is.na(df[[col]])] <- mean_value
+  }
+}
+
+# Check for null values after filling
+null_values_after <- sapply(df, function(x) sum(is.na(x)))
+
+# Create a dummy variable for the COVID period
+df$COVID_Dummy <- ifelse(df$sasdate >= as.Date("2020-03-01") & df$sasdate <= as.Date("2020-08-01"), 1, 0)
+
+# Function to perform LOOCV and calculate MSE for an AR model
+calculate_loocv_mse_ar <- function(df, target_var, max_lags) {
+  mse_results <- numeric(max_lags)
+  
+  for (p in 1:max_lags) {
+    mse_fold <- numeric(nrow(df))
+    
+    # Create lagged variables
+    for (lag in 1:p) {
+      df[paste0(target_var, "_lag", lag)] <- dplyr::lag(df[[target_var]], lag)
+    }
+    
+    for (i in 1:nrow(df)) {
+      # Exclude the i-th observation for LOOCV
+      train_data <- df[-i, ]
+      test_data <- df[i, , drop = FALSE]
+      
+      # Formula for AR model with lags of the target variable only
+      model_formula <- as.formula(paste(target_var, "~", 
+                                        paste(paste0(target_var, "_lag", 1:p), collapse = " + ")))
+      
+      # Fit the model
+      model <- dynlm(model_formula, data = train_data)
+      
+      # Predict the target variable for the left-out observation
+      prediction <- predict(model, newdata = test_data)
+      
+      # Calculate squared error for this fold
+      mse_fold[i] <- (test_data[[target_var]] - prediction)^2
+    }
+    
+    # Store the mean squared error for the current lag
+    mse_results[p] <- mean(mse_fold, na.rm = TRUE)
+    
+    # Remove lagged variables to avoid contamination in the next loop
+    for (lag in 1:p) {
+      df[[paste0(target_var, "_lag", lag)]] <- NULL
+    }
+  }
+  
+  return(mse_results)
+}
+
+# Calculate MSE for different lag orders
+mse_results <- calculate_loocv_mse_ar(df, target_var, max_lags)
+
+# Find the optimal number of lags (the one with the lowest MSE)
+optimal_lag <- which.min(mse_results)
+optimal_mse <- min(mse_results)
+
+# Output results
+cat("Optimal number of lags:", optimal_lag, "\n")
+cat("Minimum MSE:", optimal_mse, "\n")
+
+# Plot MSE results for visualization
+plot(1:max_lags, mse_results, type = "b", xlab = "Number of Lags", ylab = "MSE",
+     main = "MSE for Different Lag Orders")
+
+# Create lagged variables for AR model
+for (i in 1:max_lags) {
+  df <- df %>%
+    mutate(!!paste0("INDPRO_lag", i) := lag(INDPRO, i))
+}
+
+# Drop any rows with NA values introduced by lags
+df <- na.omit(df)
+
+# Build the AR model
+ar_formula <- as.formula(paste(target_var, "~", 
+                               paste(paste0("INDPRO_lag", 1:optimal_lag), collapse = " + "), 
+                               "+", paste(x_vars, collapse = " + ")))
+ar_model <- dynlm(ar_formula, data = df)
+
+# AR Model Summary
+cat("AR Model Summary:\n")
+print(summary(ar_model))
+
+# Generate optimal number of lagged variables for AR model
+for (i in 1:optimal_lag) {
+  df[[paste0("INDPRO_lag", i)]] <- lag(df$INDPRO, i)
+}
+
+# Drop rows with NA values introduced by the optimal lags
+df <- na.omit(df)
+
+# Fit the AR(optimal_lag) model
+ar_formula <- as.formula(
+  paste("INDPRO ~ COVID_Dummy +", paste(paste0("INDPRO_lag", 1:optimal_lag), collapse = " + "))
+)
+ar_model <- dynlm(ar_formula, data = df)
+
+# Prepare for 12-step forecast
+last_observed <- tail(df, 1)
+forecast_df <- data.frame(matrix(ncol = 1, nrow = forecast_steps))
+colnames(forecast_df) <- target_var
+
+# Forecast loop for AR(optimal_lag) model
+for (i in 1:forecast_steps) {
+  new_data <- data.frame(
+    COVID_Dummy = ifelse(as.Date(last_observed$sasdate) + i > as.Date("2020-03-01") &
+                           as.Date(last_observed$sasdate) + i <= as.Date("2020-08-01"), 1, 0)
+  )
+  
+  # Add the 12 lags for each forecast step
+  for (lag in 1:12) {
+    lag_value <- if (i <= lag) {
+      last_observed[[paste0("INDPRO_lag", lag - i + 1)]]
+    } else {
+      forecast_df[i - lag, target_var]
+    }
+    new_data[[paste0("INDPRO_lag", lag)]] <- lag_value
+  }
+  
+  # Predict using the model
+  forecast_df[i, target_var] <- predict(ar_model, newdata = new_data)
+}
+
+# Fan chart plot function using Plotly
+plot_fan_chart_plotly <- function(actual_data, forecast_data, title) {
+  # Prepare data for Plotly
+  forecast_data$Time <- seq(nrow(actual_data) + 1, nrow(actual_data) + forecast_steps)
+  combined_df <- rbind(
+    data.frame(Time = seq_len(nrow(actual_data)), Forecast = actual_data[[target_var]], Type = "Actual"),
+    data.frame(Time = forecast_data$Time, Forecast = forecast_data[[target_var]], Type = "Forecast")
+  )
+  
+  # Calculate ymin and ymax for prediction intervals
+  forecast_data$lower_80 <- forecast_data[[target_var]] * 0.9
+  forecast_data$upper_80 <- forecast_data[[target_var]] * 1.1
+  forecast_data$lower_90 <- forecast_data[[target_var]] * 0.8
+  forecast_data$upper_90 <- forecast_data[[target_var]] * 1.2
+  
+  # Create fan chart with Plotly
+  p <- plot_ly() %>%
+    add_lines(data = combined_df[combined_df$Type == "Forecast", ], x = ~Time, y = ~Forecast, name = "Forecast", line = list(color = "red")) %>%
+    add_ribbons(data = forecast_data, 
+                x = ~Time, 
+                ymin = ~lower_80, ymax = ~upper_80,
+                fillcolor = "rgba(0, 0, 255, 0.3)",
+                line = list(color = "transparent"),
+                name = "80% Prediction Interval") %>%
+    add_ribbons(data = forecast_data, 
+                x = ~Time, 
+                ymin = ~lower_90, ymax = ~upper_90,
+                fillcolor = "rgba(173, 216, 230, 0.2)",
+                line = list(color = "transparent"),
+                name = "90% Prediction Interval") %>%
+    layout(title = title, xaxis = list(title = "Time"), yaxis = list(title = target_var))
+  
+  return(p)
+}
+
+# Plot the fan chart
+fan_chart_plot <- plot_fan_chart_plotly(df, forecast_df, "12-Step Ahead Forecast with Fan Chart (AR(1) Model)")
+fan_chart_plot
