@@ -9,7 +9,7 @@ RMSE <- function(pred, truth){ #start and end body of the function by { } - same
 #Install the HDeconometrics package used in Medeiros et al. (2019) for convenient estimation
 #of LASSO and ElNet using information criteria (basically uses glmnet, and selects on criterion)
 
-install.packages("githubinstall") #this package is needed to install packages from GitHub (a popular code repository)
+#install.packages("githubinstall") #this package is needed to install packages from GitHub (a popular code repository)
 library(githubinstall)
 
 #Here, some of you may encounter the following issue:
@@ -23,7 +23,7 @@ library(githubinstall)
 
 #install Medeiros et al's package, you will be prompted to say "Yes" to confirm the name of the installed package:
 
-githubinstall("HDeconometrics")
+#githubinstall("HDeconometrics")
 
 #You will see something like:
 #Suggestion:
@@ -87,6 +87,40 @@ rw.rmse6=RMSE(oosy,rw6c)
 rw.rmse12=RMSE(oosy,rw12c)
 
 ######################################
+### Getting optimal lags using BIC ###
+######################################
+# Load necessary library
+library(stats)
+#install.packages("flexmix")
+library(flexmix)
+
+optimal_lags_bic <- function(Y, max_lag = 10) {
+  
+  bic_values <- numeric(max_lag)  # Initialize vector to store BIC values
+  
+  # Loop through 1 to max_lag and fit AR models
+  for (lag in 1:max_lag) {
+    
+    # Fit AR model using arima (with no differencing and no MA terms)
+    ar_model <- arima(Y, order = c(lag, 0, 0))  # order = (AR lags, differencing, MA lags)
+    
+    # Compute BIC using the BIC() function from flexmix
+    bic_values[lag] <- BIC(ar_model)
+  }
+  
+  # Find the lag that gives the minimum BIC
+  optimal_lag <- which.min(bic_values)
+  
+  # Return the optimal lag and the BIC values for all lags
+  return(list("optimal_lag" = optimal_lag, "bic_values" = bic_values))
+}
+
+# Example usage:
+result <- optimal_lags_bic(yy, max_lag = 12)
+print(result$optimal_lag)  # Optimal number of lags
+print(result$bic_values)   # BIC values for all lags
+
+######################################
 #Benchmark 2: AR(p) forecast
 ######################################
 
@@ -98,10 +132,10 @@ rw.rmse12=RMSE(oosy,rw12c)
 source("func-ar.R")
 
 
-bar1c=ar.rolling.window(Y,nprev,1,1,type="fixed") #1-step AR forecast
-bar3c=ar.rolling.window(Y,nprev,1,3,type="fixed") #3-step AR forecast
-bar6c=ar.rolling.window(Y,nprev,1,6,type="fixed") #6-step AR forecast
-bar12c=ar.rolling.window(Y,nprev,1,12,type="fixed") #12-step AR forecast
+bar1c=ar.rolling.window(Y,nprev,1,1,type="bic") #1-step AR forecast
+bar3c=ar.rolling.window(Y,nprev,1,3,type="bic") #3-step AR forecast
+bar6c=ar.rolling.window(Y,nprev,1,6,type="bic") #6-step AR forecast
+bar12c=ar.rolling.window(Y,nprev,1,12,type="") #12-step AR forecast
 print(bar12c$pred)
 #Benchmark forecast graphics:
 
@@ -120,10 +154,10 @@ quartz()
 plot.ts(arcoef.ts, main="AR regression coefficients", cex.axis=1.5)
 
 #Similarly, I create ts objects out of 1-step and 12-step benchmark forecasts
-bench1.ts=ts(cbind(rw1c,bar1c$pred,oosy), start=c(2010,1), end=c(2024,7), freq=12)
+bench1.ts=ts(cbind(rw1c,bar1c$pred,oosy), start=c(2010,1), end=c(2025,7), freq=12)
 colnames(bench1.ts)=c("RW","AR(4)","True Value")
 
-bench12.ts=ts(cbind(rw12c,bar12c$pred,oosy), start=c(2010,1), end=c(2024,7), freq=12)
+bench12.ts=ts(cbind(rw12c,bar12c$pred,oosy), start=c(2010,1), end=c(2025,7), freq=12)
 colnames(bench12.ts)=c("RW","AR(4)","True Value")
 
 #Plot 1-step forecasts:
@@ -149,3 +183,25 @@ ar.rmse3=bar3c$errors[1]
 ar.rmse6=bar6c$errors[1]
 ar.rmse12=bar12c$errors[1]
 
+# Forecasting using AR(p) model:
+# Forecast loop for AR(p) model
+forecast_steps <- 12
+for (i in 1:forecast_steps) {
+  new_data <- data.frame(
+    COVID_Dummy = ifelse(as.Date(last_observed$sasdate) + i > as.Date("2020-03-01") &
+                           as.Date(last_observed$sasdate) + i <= as.Date("2020-08-01"), 1, 0)
+  )
+  
+  # Add the 12 lags for each forecast step
+  for (lag in 1:12) {
+    lag_value <- if (i <= lag) {
+      last_observed[[paste0("INDPRO_lag", lag - i + 1)]]
+    } else {
+      forecast_df[i - lag, target_var]
+    }
+    new_data[[paste0("INDPRO_lag", lag)]] <- lag_value
+  }
+  
+  # Predict using the model
+  forecast_df[i, target_var] <- predict(ar_model, newdata = new_data)
+}
