@@ -25,7 +25,7 @@ runlasso=function(Y,indice,lag,alpha=1,IC="bic"){
   Y=Y[,-ncol(Y)] #data without the dummy
   comp=princomp(scale(Y,scale=FALSE)) # compute principal components to add as predictors
   Y2=cbind(Y,comp$scores[,1:6]) #augment predictors by the first 6 principal components
-  aux=embed(Y2,1+lag) #create 4 lags + forecast horizon shift (=lag option)
+  aux=embed(Y2,6+lag) #create 6 lags + forecast horizon shift (=lag option)
   y=aux[,indice] #  Y variable aligned/adjusted for missing data due do lags
   X=aux[,-c(1:(ncol(Y2)*lag))]   # lags of Y (predictors) corresponding to forecast horizon   
   
@@ -54,7 +54,7 @@ runlasso_all=function(Y,indice,lag,alpha=1,IC="bic"){
   Y=Y[,-ncol(Y)] #data without the dummy
   comp=princomp(scale(Y,scale=FALSE)) # compute principal components to add as predictors
   Y2=cbind(Y,comp$scores[,1:35]) #augment predictors by the first 6 principal components
-  aux=embed(Y2,1+lag) #create 4 lags + forecast horizon shift (=lag option)
+  aux=embed(Y2,6+lag) #create 6 lags + forecast horizon shift (=lag option)
   y=aux[,indice] #  Y variable aligned/adjusted for missing data due do lags
   X=aux[,-c(1:(ncol(Y2)*lag))]   # lags of Y (predictors) corresponding to forecast horizon   
   
@@ -182,7 +182,7 @@ runpols=function(Y,indice,lag,coef){
   Y=Y[,-ncol(Y)]  #data without the dummy
   comp=princomp(scale(Y,scale=FALSE)) # compute principal components to add as predictors
   Y2=cbind(Y,comp$scores[,1:6]) #augment predictors by the first 6 principal components
-  aux=embed(Y2,1+lag) #create 4 lags + forecast horizon shift (=lag option)
+  aux=embed(Y2,6+lag) #create 6 lags + forecast horizon shift (=lag option)
   y=aux[,indice] #  Y variable aligned/adjusted for missing data due do lags
   X=aux[,-c(1:(ncol(Y2)*lag))]   # lags of Y (predictors) corresponding to forecast horizon   
   
@@ -215,8 +215,8 @@ runpols_all=function(Y,indice,lag,coef){
   dum=Y[,ncol(Y)] # extract dummy from data
   Y=Y[,-ncol(Y)]  #data without the dummy
   comp=princomp(scale(Y,scale=FALSE)) # compute principal components to add as predictors
-  Y2=cbind(Y,comp$scores[,1:35]) #augment predictors by the first 6 principal components
-  aux=embed(Y2,1+lag) #create 4 lags + forecast horizon shift (=lag option)
+  Y2=cbind(Y,comp$scores[,1:35]) #augment predictors by the first 35 principal components
+  aux=embed(Y2,6+lag) #create 6 lags + forecast horizon shift (=lag option)
   y=aux[,indice] #  Y variable aligned/adjusted for missing data due do lags
   X=aux[,-c(1:(ncol(Y2)*lag))]   # lags of Y (predictors) corresponding to forecast horizon   
   

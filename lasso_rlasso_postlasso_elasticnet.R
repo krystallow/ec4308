@@ -81,7 +81,7 @@ source("func-rlasso.R")
 
 nprev=230 #number of out-of-sample observations (test window ) # 30%
 
-oosy=tail(yy,nprev) #auxiliary:get the out-of-sample true values (last 180 obs. using tail())
+oosy=tail(yy,nprev) #auxiliary:get the out-of-sample true values 
 
 
 ############################################################################
@@ -252,10 +252,6 @@ df <- read_excel("Final_Transformed_Dataset.xlsx",
                                "numeric"))
 
 df <- df[-1, ]   
-#selected_variables <- read.csv("variables_selected.csv")
-#selected_cols <- c("sasdate", "INDPRO", colnames(selected_variables))
-#df <- df[, selected_cols]
-
 
 ## Create dummy variable for 2020 Covid
 df$sasdate <- as.Date(df$sasdate)
@@ -373,3 +369,4 @@ colnames(elcoef.ts)=c("1-step","3-step","6-step","12-step")
 #Plot numbers of nonzero coefficients across the test window:
 windows()
 plot.ts(elcoef.ts, main="Sparsity Analysis for ElNet",cex.axis=1.5)
+
