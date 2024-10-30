@@ -1,201 +1,176 @@
-# Install and load necessary libraries
-required_packages <- c("forecast", "dplyr", "dynlm", "ggplot2", "plotly")
+rm(list=ls())
 
-# Check for missing packages and install them
-new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
-if (length(new_packages)) {
-  install.packages(new_packages)
-}
+#Auxiliary function to compute root MSE (same as MSE before, but with square root):
+RMSE <- function(pred, truth){ #start and end body of the function by { } - same as a loop 
+  return(sqrt(mean((truth - pred)^2)))
+} 
 
-# Load the libraries
-library(forecast)
+#install.packages("githubinstall") #this package is needed to install packages from GitHub (a popular code repository)
+library(githubinstall)
+
+#Here, some of you may encounter the following issue:
+#You may see an error like this when trying to load the "githubinstall" library:
+#Error in loadNamespace(j <- i[[1L]], c(lib.loc, .libPaths()), versionCheck = vI[[j]]) :  namespace 'cli' 3.x.x is already loaded, but >= 3.x.x is required
+
+#If you see this, the following should fix it (reinstall the "cli" package):
+#remove.packages("cli")
+#install.packages("cli")
+
+#install Medeiros et al's package, you will be prompted to say "Yes" to confirm the name of the installed package:
+
+#githubinstall("HDeconometrics")
+
+#You will see something like:
+#Suggestion:
+#  - gabrielrvsc/HDeconometrics  Set of R functions for high-dimensional econometrics
+#Do you want to install the package (Y/n)?  
+#Type "Y" in the command line and press Enter
+
+library(HDeconometrics)
+#install.packages("sandwich")
+library(sandwich) #library to estimate variance for DM test regression using NeweyWest()
+library(randomForest)
+library(hdm)
+library(readr)
+library(xts)
 library(dplyr)
-library(dynlm)
-library(ggplot2)
-library(plotly)
+library(tibble)
+###########################
+###########################
+###########################
+#Set working directory and load data:
+#setwd("D:/data") #set your working directory here - or load data directly via RStudio interface
 
-# Set parameters
-csv_file_path <- "Final_Transformed_Dataset.csv"
-target_var <- "INDPRO"
-# x_vars <- c("IPFPNSS", "IPMAT", "IPDMAT", "IPMANSICS", "UNRATE",
-#             "CES1021000001", "AWOTMAN", "CES0600000008",
-#             "CES3000000008", "CIVPART", "LNS11300036", "FEDFUNDS", "COVID_Dummy")
-x_vars <- "COVID_Dummy"
-max_lags <- 12
-forecast_steps <- 12
+# Move 'date' column to rownames and remove it from the dataframe
+Final_Transformed_Dataset <- read_csv("Final_Transformed_Dataset.csv", 
+                                      col_types = cols(sasdate = col_date(format = "%m/%d/%Y")))
+df <- Final_Transformed_Dataset %>%
+  column_to_rownames(var = "sasdate")
 
-# Load the CSV file
-df <- read.csv(csv_file_path, stringsAsFactors = FALSE)
+### Some preliminary data manipulation
+Y=df #this is the matrix of all variables, Y and X. It is in a format of a matrix with added column names.
+dum=rep(0,nrow(Y)) # 1st step in creating the 2020 outlier dummy - a vector of zeros of conformable length to rest of the data
+dum[which.min(Y[,1])]=1 #create dummy for outlier in 2020 - corresponds to the minimum of the first column, which is INDPRO
+Y=cbind(Y,dum=dum) #add dummy to data matrix
 
-# Convert 'sasdate' column to Date format
-df$sasdate <- as.Date(df$sasdate, format = "%m/%d/%Y")
+yy=Y[,1] #get the y variable - INDPRO
 
-# Fill null values in numeric columns with the mean of those columns
-for (col in names(df)) {
-  if (is.numeric(df[[col]])) {
-    mean_value <- mean(df[[col]], na.rm = TRUE)
-    df[[col]][is.na(df[[col]])] <- mean_value
-  }
-}
+nprev=230 #number of out-of-sample observations (test window - 30 % of the observations)
 
-# Check for null values after filling
-null_values_after <- sapply(df, function(x) sum(is.na(x)))
+oosy=tail(yy,nprev) #auxiliary:get the out-of-sample true values (last 230 obs. using tail())
 
-# Create a dummy variable for the COVID period
-df$COVID_Dummy <- ifelse(df$sasdate >= as.Date("2020-03-01") & df$sasdate <= as.Date("2020-08-01"), 1, 0)
+#create lags
+rwtemp=embed(yy,13)
+# this creates a matrix where each row contains the current observation of yy along with the 12 preceding observations
 
-# Function to perform LOOCV and calculate MSE for an AR model
-calculate_loocv_mse_ar <- function(df, target_var, max_lags) {
-  mse_results <- numeric(max_lags)
+#Simple Random Walk forecast:
+rw1c=tail(rwtemp[,2],nprev)
+rw3c=tail(rwtemp[,4],nprev) 
+rw6c=tail(rwtemp[,7],nprev)
+rw12c=tail(rwtemp[,13],nprev)
+# rwtemp[,13] refers to the fourth column of the rwtemp matrix, which contains the values lagged by 12 periods
+# 12-step ahead random walk forecast, where the value at time t is predicted to be the same as the value at time t−12
+
+#Collect RMSE's for randomw walk:
+rw.rmse1=RMSE(oosy,rw1c)
+rw.rmse3=RMSE(oosy,rw3c)
+rw.rmse6=RMSE(oosy,rw6c)
+rw.rmse12=RMSE(oosy,rw12c)
+
+######################################
+### Getting optimal lags using BIC ###
+######################################
+# Load necessary library
+#install.packages("flexmix")
+library(flexmix)
+
+optimal_lags_bic <- function(Y, max_lag = 10) {
   
-  for (p in 1:max_lags) {
-    mse_fold <- numeric(nrow(df))
+  bic_values <- numeric(max_lag)  # Initialize vector to store BIC values
+  
+  # Loop through 1 to max_lag and fit AR models
+  for (lag in 1:max_lag) {
     
-    # Create lagged variables
-    for (lag in 1:p) {
-      df[paste0(target_var, "_lag", lag)] <- dplyr::lag(df[[target_var]], lag)
-    }
+    # Fit AR model using arima (with no differencing and no MA terms)
+    ar_model <- arima(Y, order = c(lag, 0, 0))  # order = (AR lags, differencing, MA lags)
     
-    for (i in 1:nrow(df)) {
-      # Exclude the i-th observation for LOOCV
-      train_data <- df[-i, ]
-      test_data <- df[i, , drop = FALSE]
-      
-      # Formula for AR model with lags of the target variable only
-      model_formula <- as.formula(paste(target_var, "~", 
-                                        paste(paste0(target_var, "_lag", 1:p), collapse = " + ")))
-      
-      # Fit the model
-      model <- dynlm(model_formula, data = train_data)
-      
-      # Predict the target variable for the left-out observation
-      prediction <- predict(model, newdata = test_data)
-      
-      # Calculate squared error for this fold
-      mse_fold[i] <- (test_data[[target_var]] - prediction)^2
-    }
-    
-    # Store the mean squared error for the current lag
-    mse_results[p] <- mean(mse_fold, na.rm = TRUE)
-    
-    # Remove lagged variables to avoid contamination in the next loop
-    for (lag in 1:p) {
-      df[[paste0(target_var, "_lag", lag)]] <- NULL
-    }
+    # Compute BIC using the BIC() function from flexmix
+    bic_values[lag] <- BIC(ar_model)
   }
   
-  return(mse_results)
+  # Find the lag that gives the minimum BIC
+  optimal_lag <- which.min(bic_values)
+  
+  # Return the optimal lag and the BIC values for all lags
+  return(list("optimal_lag" = optimal_lag, "bic_values" = bic_values))
 }
 
-# Calculate MSE for different lag orders
-mse_results <- calculate_loocv_mse_ar(df, target_var, max_lags)
+result <- optimal_lags_bic(yy, max_lag = 12)
+optimal_lag <- result$optimal_lag  # Optimal number of lags
+print(optimal_lag)
+print(result$bic_values)   # BIC values for all lags
 
-# Find the optimal number of lags (the one with the lowest MSE)
-optimal_lag <- which.min(mse_results)
-optimal_mse <- min(mse_results)
+######################################
+#Benchmark 2: AR(p) forecast
+######################################
 
-# Output results
-cat("Optimal number of lags:", optimal_lag, "\n")
-cat("Minimum MSE:", optimal_mse, "\n")
+#Perform AR(p) forecasts using rolling window.
+#See the file func-ar.R for the forecast construction details there
 
-# Plot MSE results for visualization
-plot(1:max_lags, mse_results, type = "b", xlab = "Number of Lags", ylab = "MSE",
-     main = "MSE for Different Lag Orders")
+#Add the functions  in func-ar.R (must be in your working directory)
+#Or simply open up func-ar.R and execute the function commands there
+source("func-ar.R")
 
-# Create lagged variables for AR model
-for (i in 1:max_lags) {
-  df <- df %>%
-    mutate(!!paste0("INDPRO_lag", i) := lag(INDPRO, i))
-}
+bar1c=ar.rolling.window(Y,nprev,1,1,type="bic") #1-step AR forecast
+bar3c=ar.rolling.window(Y,nprev,1,3,type="bic") #3-step AR forecast
+bar6c=ar.rolling.window(Y,nprev,1,6,type="bic") #6-step AR forecast
+bar12c=ar.rolling.window(Y,nprev,1,12,type="bic") #12-step AR forecast
 
-# Drop any rows with NA values introduced by lags
-df <- na.omit(df)
+#Benchmark forecast graphics:
 
-# Build the AR model
-ar_formula <- as.formula(paste(target_var, "~", 
-                               paste(paste0("INDPRO_lag", 1:optimal_lag), collapse = " + "), 
-                               "+", paste(x_vars, collapse = " + ")))
-ar_model <- dynlm(ar_formula, data = df)
+#Plot benchmark coefficients
+#Here I use plot.ts(), which plots time series objects that are dated
 
-# AR Model Summary
-cat("AR Model Summary:\n")
-print(summary(ar_model))
+#First, I make a coefficient matrix a time-series object by using ts() function
+#Main reason: I want dates on the X-axis
 
-# Generate optimal number of lagged variables for AR model
-for (i in 1:optimal_lag) {
-  df[[paste0("INDPRO_lag", i)]] <- lag(df$INDPRO, i)
-}
+#Syntax: ts(object, start=startdate, end=enddate, freq=frequency (periods per year))
+arcoef.ts=ts(bar1c$coef, start=c(2010,1), end=c(2024,7), freq=12)
+colnames(arcoef.ts)=c("Constant","1st Lag","2nd Lag") #name columns to distinguish plots
 
-# Drop rows with NA values introduced by the optimal lags
-df <- na.omit(df)
+#Plot all the coefficients over time (plot.ts() same as plot, but for tme series objects):
+quartz()
+plot.ts(arcoef.ts, main="AR regression coefficients", cex.axis=1.5)
 
-# Fit the AR(optimal_lag) model
-ar_formula <- as.formula(
-  paste("INDPRO ~ COVID_Dummy +", paste(paste0("INDPRO_lag", 1:optimal_lag), collapse = " + "))
-)
-ar_model <- dynlm(ar_formula, data = df)
+#Similarly, I create ts objects out of 1-step and 12-step benchmark forecasts
+bench1.ts=ts(cbind(rw1c,bar1c$pred,oosy), start=c(2010,1), end=c(2024,7), freq=12)
+colnames(bench1.ts)=c("RW","AR(1)","True Value")
 
-# Prepare for 12-step forecast
-last_observed <- tail(df, 1)
-forecast_df <- data.frame(matrix(ncol = 1, nrow = forecast_steps))
-colnames(forecast_df) <- target_var
+bench12.ts=ts(cbind(rw12c,bar12c$pred,oosy), start=c(2010,1), end=c(2024,7), freq=12)
+colnames(bench12.ts)=c("RW","AR(1)","True Value")
 
-# Forecast loop for AR(optimal_lag) model
-for (i in 1:forecast_steps) {
-  new_data <- data.frame(
-    COVID_Dummy = ifelse(as.Date(last_observed$sasdate) + i > as.Date("2020-03-01") &
-                           as.Date(last_observed$sasdate) + i <= as.Date("2020-08-01"), 1, 0)
-  )
-  
-  # Add the 12 lags for each forecast step
-  for (lag in 1:12) {
-    lag_value <- if (i <= lag) {
-      last_observed[[paste0("INDPRO_lag", lag - i + 1)]]
-    } else {
-      forecast_df[i - lag, target_var]
-    }
-    new_data[[paste0("INDPRO_lag", lag)]] <- lag_value
-  }
-  
-  # Predict using the model
-  forecast_df[i, target_var] <- predict(ar_model, newdata = new_data)
-}
+#Plot 1-step forecasts:
 
-# Fan chart plot function using Plotly
-plot_fan_chart_plotly <- function(actual_data, forecast_data, title) {
-  # Prepare data for Plotly
-  forecast_data$Time <- seq(nrow(actual_data) + 1, nrow(actual_data) + forecast_steps)
-  combined_df <- rbind(
-    data.frame(Time = seq_len(nrow(actual_data)), Forecast = actual_data[[target_var]], Type = "Actual"),
-    data.frame(Time = forecast_data$Time, Forecast = forecast_data[[target_var]], Type = "Forecast")
-  )
-  
-  # Calculate ymin and ymax for prediction intervals
-  forecast_data$lower_80 <- forecast_data[[target_var]] * 0.9
-  forecast_data$upper_80 <- forecast_data[[target_var]] * 1.1
-  forecast_data$lower_90 <- forecast_data[[target_var]] * 0.8
-  forecast_data$upper_90 <- forecast_data[[target_var]] * 1.2
-  
-  # Create fan chart with Plotly
-  p <- plot_ly() %>%
-    add_lines(data = combined_df[combined_df$Type == "Forecast", ], x = ~Time, y = ~Forecast, name = "Forecast", line = list(color = "red")) %>%
-    add_ribbons(data = forecast_data, 
-                x = ~Time, 
-                ymin = ~lower_80, ymax = ~upper_80,
-                fillcolor = "rgba(0, 0, 255, 0.3)",
-                line = list(color = "transparent"),
-                name = "80% Prediction Interval") %>%
-    add_ribbons(data = forecast_data, 
-                x = ~Time, 
-                ymin = ~lower_90, ymax = ~upper_90,
-                fillcolor = "rgba(173, 216, 230, 0.2)",
-                line = list(color = "transparent"),
-                name = "90% Prediction Interval") %>%
-    layout(title = title, xaxis = list(title = "Time"), yaxis = list(title = target_var))
-  
-  return(p)
-}
+quartz()
+plot.ts(bench1.ts[,1], main="1-step Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="blue", ylab="INDRPO")
+points(bench1.ts[,2], type="l", col="red",lwd=1.8) # AR(1) Model
+points(bench1.ts[,3], type="l", col="black",lwd=2) #True Value
+legend("bottomleft",legend=c("RW","AR(1)","INDPRO"))
 
-# Plot the fan chart
-fan_chart_plot <- plot_fan_chart_plotly(df, forecast_df, "12-Step Ahead Forecast with Fan Chart (AR(1) Model)")
-fan_chart_plot
+#Plot 12-step forecasts:
+
+quartz()
+plot.ts(bench12.ts[,1], main="12-step Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="blue", ylab="INDPRO")
+points(bench12.ts[,2], type="l", col="red",lwd=1.8)
+points(bench12.ts[,3], type="l", col="black",lwd=2)
+legend("bottomleft",legend=c("RW","AR(1)","INDPRO"))
+
+#AR forecasts RMSE:
+
+ar.rmse1=bar1c$errors[1]
+ar.rmse3=bar3c$errors[1]
+ar.rmse6=bar6c$errors[1]
+ar.rmse12=bar12c$errors[1]
+
+# For DM test:
+predicted_values = bar12c$pred
