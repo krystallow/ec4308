@@ -4,6 +4,59 @@
 df <- na.omit(read_excel("Final_Transformed_Dataset.xlsx"))
 df <- df[-1, -1]
 
+df <- read_excel("Final_Transformed_Dataset.xlsx", 
+                 col_types = c("date", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric", "numeric", "numeric", 
+                               "numeric"))
+
+df <- df[-1, ]   
+
+## Create dummy variable for 2020 Covid
+df$sasdate <- as.Date(df$sasdate)
+dum <- ifelse(format(df$sasdate, "%Y") == "2020", 1, 0)
+
+Y <- cbind(df, dum = dum)
+Y <- Y[,-1]
+Y <- Y[apply(Y, 1, function(row) all(is.finite(row) & !is.na(row))), ]
+df <- Y
+
+
 ntrain <- floor(0.7 * nrow(df))  # take 70% train
 tr = sample(1:nrow(df),ntrain)  
 train = df[tr,]   
