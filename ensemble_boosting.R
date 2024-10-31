@@ -1,51 +1,53 @@
-############################
-### Ensemble - Boosting  ###
-############################
-library(gbm)
-library(readxl)
-library(Metrics)
-
-set.seed(2457829) #seed of the random number generator for replicability
-
+###################################################
+### Ensemble - Boosting for Variable Selection  ### > ON CV
+###################################################
 df <- na.omit(read_excel("Final_Transformed_Dataset.xlsx"))
-df <- df[-1, ]
-selected_variables <- read.csv("variables_selected.csv")
-selected_cols <- c("INDPRO", colnames(selected_variables))
-df <- df[, selected_cols]
-
+df <- df[-1, -1]
 
 ntrain <- floor(0.7 * nrow(df))  # take 70% train
 tr = sample(1:nrow(df),ntrain)  
 train = df[tr,]   
 test = df[-tr,]  
 
-boostfit = gbm(INDPRO ~.,data=train,distribution='gaussian',bag.fraction = .5,
-               interaction.depth=2,n.trees=10000,shrinkage=.01)
+boostfit_cv <- gbm(
+  INDPRO ~.,
+  data = train,
+  distribution = 'gaussian',
+  bag.fraction = 0.5,
+  interaction.depth = 5,
+  n.trees = 10000,
+  shrinkage = 0.01,
+  cv.folds = 10
+)
 
-#We can then compute the estimated optimal M (number of iterations) using the gbm.perf() function:
-#Note the option method: choices are "OOB" for out-of-bag or "cv" for cross-validation (need to specify cv.folds in the gbm call)
-best = gbm.perf(boostfit, method="OOB")
 
-ntreev = c(5,best,10000) # different numbers of iterations considered
+best_cv <- gbm.perf(boostfit_cv, method = "cv")
 
-nset = length(ntreev) #no of iterations considered
+set.seed(2457829) 
+
+ntree = c(5,best_cv,10000) # different numbers of iterations considered
+
+nset = length(ntree) #no of iterations considered
 
 fmat = matrix(0,ntrain,nset) #blank for predictions
 
 #Get the three boosting fits in a loop
 
 for(i in 1:nset) {
-  
-  boostfit = gbm(INDPRO ~.,data=train,distribution='gaussian',
-                 interaction.depth=2,n.trees=ntreev[i],shrinkage=.1)
-  
-  #NB: here I use a larger  shrinkage parameter (0.1 vs 0.01) in order to have a more illustrative figure
-  
-  fmat[,i] = predict(boostfit,n.trees=ntreev[i])
+  boostfit_cv <- gbm(
+    INDPRO ~.,
+    data = train,
+    distribution = 'gaussian',
+    bag.fraction = 0.5,
+    interaction.depth = 5,
+    n.trees = 10000,
+    shrinkage = 0.01,
+    cv.folds = 10
+  )
+  fmat[,i] = predict(boostfit_cv,n.trees=ntree[i])
 }
 
-boosting_pred <- predict(boostfit)
-
+boostingcv_pred <- predict(boostfit_cv)
 
 multi_step_forecast <- function(model, train_data, test_data, horizon) {
   n_train <- nrow(train_data)
@@ -66,7 +68,7 @@ multi_step_forecast <- function(model, train_data, test_data, horizon) {
       combined_data <- rbind(combined_data, current_test_point)
       
       # Predict using the model for the current step
-      predictions[i] <- predict(model, newdata = combined_data[nrow(combined_data), , drop = FALSE], n.trees = best)
+      predictions[i] <- predict(model, newdata = combined_data[nrow(combined_data), , drop = FALSE], n.trees = best_cv)
       
       # Use the predicted value to update INDPRO in combined_data
       combined_data[nrow(combined_data), "INDPRO"] <- predictions[i]
@@ -85,7 +87,7 @@ rmse_results <- list()
 
 for (h in h_steps) {
   # Generate forecasts for the entire test set for h-step horizon
-  forecast_results[[as.character(h)]] <- multi_step_forecast(boostfit, train, test, horizon = h)
+  forecast_results[[as.character(h)]] <- multi_step_forecast(boostfit_cv, train, test, horizon = h)
   
   # Get the actual values from the test set
   actual_values <- test$INDPRO
