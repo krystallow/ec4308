@@ -1,6 +1,13 @@
 ###################################################
 ### Ensemble - Boosting for Variable Selection  ### > ON CV
 ###################################################
+library(glmnet)
+library(readxl)
+library(gbm)
+library(Metrics)
+library(ggplot2)
+library(dplyr)
+
 df <- na.omit(read_excel("Final_Transformed_Dataset.xlsx"))
 df <- df[-1, -1]
 
@@ -152,3 +159,57 @@ for (h in h_steps) {
 
 print(forecast_results)
 print(rmse_results)
+
+
+###############################################
+### Selected variables on importance score  ###
+###############################################
+importance_scores <- summary(boostfit_cv, plotit = FALSE)
+selected_vars <- importance_scores$var[importance_scores$rel.inf > 1]  # Keep variables with > 1% importance
+
+
+#######################
+### Forecast Plots  ###
+#######################
+
+full_indices <- seq_len(nrow(df))         
+test_indices <- (ntrain + 1):nrow(df)   
+
+actual_values <- data.frame(Index = full_indices, INDPRO = df[, "INDPRO"])
+
+# 1-step forecast plot
+forecasted_values_1 <- data.frame(Index = test_indices, INDPRO = forecast_results[["1"]])
+p1 <- ggplot() +
+  geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
+  geom_line(data = forecasted_values_1, aes(x = Index, y = INDPRO), color = "red", size = 1, linetype = "dashed") +
+  labs(title = "Forecast Horizon: 1 Step", x = "Observation Index", y = "INDPRO") +
+  theme_minimal()
+print(p1)
+
+
+# 3-step forecast plot
+forecasted_values_3 <- data.frame(Index = test_indices, INDPRO = forecast_results[["3"]])
+p3 <- ggplot() +
+  geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
+  geom_line(data = forecasted_values_3, aes(x = Index, y = INDPRO), color = "red", size = 1, linetype = "dashed") +
+  labs(title = "Forecast Horizon: 3 Steps", x = "Observation Index", y = "INDPRO") +
+  theme_minimal()
+print(p3)
+
+# 6-step forecast plot
+forecasted_values_6 <- data.frame(Index = test_indices, INDPRO = forecast_results[["6"]])
+p6 <- ggplot() +
+  geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
+  geom_line(data = forecasted_values_6, aes(x = Index, y = INDPRO), color = "red", size = 1, linetype = "dashed") +
+  labs(title = "Forecast Horizon: 6 Steps", x = "Observation Index", y = "INDPRO") +
+  theme_minimal()
+print(p6)
+
+# 12-step forecast plot
+forecasted_values_12 <- data.frame(Index = test_indices, INDPRO = forecast_results[["12"]])
+p12 <- ggplot() +
+  geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
+  geom_line(data = forecasted_values_12, aes(x = Index, y = INDPRO), color = "red", size = 1, linetype = "dashed") +
+  labs(title = "Forecast Horizon: 12 Steps", x = "Observation Index", y = "INDPRO") +
+  theme_minimal()
+print(p12)

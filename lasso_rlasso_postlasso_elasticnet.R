@@ -3,7 +3,7 @@
 ############################################################
 
 library(readxl)
-library(sandwich) 
+library(sandwich)
 library(randomForest)
 library(hdm)
 library(glmnet)
@@ -175,3 +175,53 @@ colnames(elcoef.ts)=c("1-step","3-step","6-step","12-step")
 windows()
 plot.ts(elcoef.ts, main="Sparsity Analysis for ElNet",cex.axis=1.5)
 
+
+#################################
+### To see Selected Variables ###
+#################################
+
+get_selected_variables <- function(model_output, variable_names) {
+  # Get the last row of the coefficients (final model)
+  final_coefficients <- tail(model_output$coef, n = 1)
+  
+  # Find indices of non-zero coefficients in the last row
+  selected_indices <- which(final_coefficients != 0)
+  
+  # Retrieve variable names for non-zero coefficients
+  selected_variables <- variable_names[selected_indices]
+  
+  return(selected_variables)
+}
+
+
+variable_names <- colnames(Y)[-1] 
+
+# Extract selected variables for each model and forecast horizon
+selected_vars_lasso1 <- get_selected_variables(lasso1c, variable_names)
+selected_vars_lasso3 <- get_selected_variables(lasso3c, variable_names)
+selected_vars_lasso6 <- get_selected_variables(lasso6c, variable_names)
+selected_vars_lasso12 <- get_selected_variables(lasso12c, variable_names)
+
+selected_vars_rlasso1 <- get_selected_variables(rlasso1c, variable_names)
+selected_vars_rlasso3 <- get_selected_variables(rlasso3c, variable_names)
+selected_vars_rlasso6 <- get_selected_variables(rlasso6c, variable_names)
+selected_vars_rlasso12 <- get_selected_variables(rlasso12c, variable_names)
+
+selected_vars_prlasso1 <- get_selected_variables(prlasso1c, variable_names)
+selected_vars_prlasso3 <- get_selected_variables(prlasso3c, variable_names)
+selected_vars_prlasso6 <- get_selected_variables(prlasso6c, variable_names)
+selected_vars_prlasso12 <- get_selected_variables(prlasso12c, variable_names)
+
+selected_vars_elnet1 <- get_selected_variables(elasticnet1c, variable_names)
+selected_vars_elnet3 <- get_selected_variables(elasticnet3c, variable_names)
+selected_vars_elnet6 <- get_selected_variables(elasticnet6c, variable_names)
+selected_vars_elnet12 <- get_selected_variables(elasticnet12c, variable_names)
+
+selected_vars <- list(
+  LASSO = list(h1 = selected_vars_lasso1, h3 = selected_vars_lasso3, h6 = selected_vars_lasso6, h12 = selected_vars_lasso12),
+  rLASSO = list(h1 = selected_vars_rlasso1, h3 = selected_vars_rlasso3, h6 = selected_vars_rlasso6, h12 = selected_vars_rlasso12),
+  post_LASSO = list(h1 = selected_vars_prlasso1, h3 = selected_vars_prlasso3, h6 = selected_vars_prlasso6, h12 = selected_vars_prlasso12),
+  Elastic_Net = list(h1 = selected_vars_elnet1, h3 = selected_vars_elnet3, h6 = selected_vars_elnet6, h12 = selected_vars_elnet12)
+)
+
+print(selected_vars)
