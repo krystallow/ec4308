@@ -91,8 +91,6 @@ nset = length(ntree) #no of iterations considered
 
 fmat = matrix(0,ntrain,nset) #blank for predictions
 
-#Get the three boosting fits in a loop
-
 for(i in 1:nset) {
   boostfit_cv <- gbm(
     INDPRO ~.,
@@ -109,56 +107,51 @@ for(i in 1:nset) {
 
 boostingcv_pred <- predict(boostfit_cv)
 
+boost1c <- list()
+boost3c <- list()
+boost6c <- list()
+boost12 <- list()
+
+# Function for multi-step forecasting with additional outputs
 multi_step_forecast <- function(model, train_data, test_data, horizon) {
   n_train <- nrow(train_data)
   n_test <- nrow(test_data)
   
-  # Initialise a matrix to store predictions for each horizon
+  # Initialise a vector to store predictions for each horizon
   predictions <- numeric(n_test)
   
-  combined_data <- train_data  # Initialise with training data
+  # Combine the training and test data for sequential prediction
+  combined_data <- train_data
   
   for (i in 1:(n_test - horizon + 1)) {
-    # Combine train data with the test data up to the i-th point
     combined_data <- rbind(combined_data, test_data[1:(i - 1), , drop = FALSE])
     
     for (h in 1:horizon) {
-      # Add the current test point to combined data for step-by-step forecasting
       current_test_point <- test_data[i + h - 1, , drop = FALSE]
       combined_data <- rbind(combined_data, current_test_point)
       
-      # Predict using the model for the current step
+      # Predict the current step
       predictions[i] <- predict(model, newdata = combined_data[nrow(combined_data), , drop = FALSE], n.trees = best_cv)
       
-      # Use the predicted value to update INDPRO in combined_data
+      # Update INDPRO for step-by-step forecasting
       combined_data[nrow(combined_data), "INDPRO"] <- predictions[i]
     }
   }
   
-  return(predictions)
+  # Calculate model coefficients as feature importances
+  coefficients <- summary(model, n.trees = best_cv, plotit = FALSE)
+  
+  # Calculate RMSE for predictions
+  actual_values <- test_data$INDPRO
+  rmse_value <- sqrt(mean((actual_values - predictions)^2))
+  
+  return(list(pred = predictions, coef = coefficients, errors = c(rmse = rmse_value)))
 }
 
-
-h_steps <- c(1, 3, 6, 12)
-
-
-forecast_results <- list()
-rmse_results <- list()
-
-for (h in h_steps) {
-  # Generate forecasts for the entire test set for h-step horizon
-  forecast_results[[as.character(h)]] <- multi_step_forecast(boostfit_cv, train, test, horizon = h)
-  
-  # Get the actual values from the test set
-  actual_values <- test$INDPRO
-  
-  # Calculate RMSE for each horizon
-  rmse_results[[as.character(h)]] <- rmse(actual_values, forecast_results[[as.character(h)]])
-}
-
-
-print(forecast_results)
-print(rmse_results)
+boost1c <- multi_step_forecast(boostfit_cv, train, test, horizon = 1)
+boost3c <- multi_step_forecast(boostfit_cv, train, test, horizon = 3)
+boost6c <- multi_step_forecast(boostfit_cv, train, test, horizon = 6)
+boost12c <- multi_step_forecast(boostfit_cv, train, test, horizon = 12)
 
 
 ###############################################
@@ -167,49 +160,49 @@ print(rmse_results)
 importance_scores <- summary(boostfit_cv, plotit = FALSE)
 selected_vars <- importance_scores$var[importance_scores$rel.inf > 1]  # Keep variables with > 1% importance
 
-
 #######################
 ### Forecast Plots  ###
 #######################
+library(gridExtra)
 
 full_indices <- seq_len(nrow(df))         
-test_indices <- (ntrain + 1):nrow(df)   
+test_indices <- (ntrain + 1):nrow(df)    
 
 actual_values <- data.frame(Index = full_indices, INDPRO = df[, "INDPRO"])
 
 # 1-step forecast plot
-forecasted_values_1 <- data.frame(Index = test_indices, INDPRO = forecast_results[["1"]])
+forecasted_values_1 <- data.frame(Index = test_indices, INDPRO = boost1c$pred)
 p1 <- ggplot() +
   geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
-  geom_line(data = forecasted_values_1, aes(x = Index, y = INDPRO), color = "red", size = 1, linetype = "dashed") +
+  geom_line(data = forecasted_values_1, aes(x = Index, y = INDPRO), color = "red", size = 1) +
   labs(title = "Forecast Horizon: 1 Step", x = "Observation Index", y = "INDPRO") +
   theme_minimal()
-print(p1)
-
 
 # 3-step forecast plot
-forecasted_values_3 <- data.frame(Index = test_indices, INDPRO = forecast_results[["3"]])
+forecasted_values_3 <- data.frame(Index = test_indices, INDPRO = boost3c$pred)
 p3 <- ggplot() +
   geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
-  geom_line(data = forecasted_values_3, aes(x = Index, y = INDPRO), color = "red", size = 1, linetype = "dashed") +
+  geom_line(data = forecasted_values_3, aes(x = Index, y = INDPRO), color = "red", size = 1) +
   labs(title = "Forecast Horizon: 3 Steps", x = "Observation Index", y = "INDPRO") +
   theme_minimal()
-print(p3)
 
 # 6-step forecast plot
-forecasted_values_6 <- data.frame(Index = test_indices, INDPRO = forecast_results[["6"]])
+forecasted_values_6 <- data.frame(Index = test_indices, INDPRO = boost6c$pred)
 p6 <- ggplot() +
   geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
-  geom_line(data = forecasted_values_6, aes(x = Index, y = INDPRO), color = "red", size = 1, linetype = "dashed") +
+  geom_line(data = forecasted_values_6, aes(x = Index, y = INDPRO), color = "red", size = 1) +
   labs(title = "Forecast Horizon: 6 Steps", x = "Observation Index", y = "INDPRO") +
   theme_minimal()
-print(p6)
 
 # 12-step forecast plot
-forecasted_values_12 <- data.frame(Index = test_indices, INDPRO = forecast_results[["12"]])
+forecasted_values_12 <- data.frame(Index = test_indices, INDPRO = boost12c$pred)
 p12 <- ggplot() +
   geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
-  geom_line(data = forecasted_values_12, aes(x = Index, y = INDPRO), color = "red", size = 1, linetype = "dashed") +
+  geom_line(data = forecasted_values_12, aes(x = Index, y = INDPRO), color = "red", size = 1) +
   labs(title = "Forecast Horizon: 12 Steps", x = "Observation Index", y = "INDPRO") +
   theme_minimal()
-print(p12)
+
+grid.arrange(p1, p3, p6, p12, ncol = 2)
+
+
+

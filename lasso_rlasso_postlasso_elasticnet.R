@@ -119,10 +119,10 @@ prlasso6c=rlasso.rolling.window.all(Y,nprev,1,6,TRUE)
 prlasso12c=rlasso.rolling.window.all(Y,nprev,1,12,TRUE)
 
 # post-LASSO RMSE's
-prlasso.rmse1=rlasso1c$errors[1]
-prlasso.rmse3=rlasso3c$errors[1]
-prlasso.rmse6=rlasso6c$errors[1]
-prlasso.rmse12=rlasso12c$errors[1]
+prlasso.rmse1=prlasso1c$errors[1]
+prlasso.rmse3=prlasso3c$errors[1]
+prlasso.rmse6=prlasso6c$errors[1]
+prlasso.rmse12=prlasso12c$errors[1]
 
 
 
