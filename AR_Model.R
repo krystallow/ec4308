@@ -120,11 +120,15 @@ print(result$bic_values)   # BIC values for all lags
 #Add the functions  in func-ar.R (must be in your working directory)
 #Or simply open up func-ar.R and execute the function commands there
 source("func-ar.R")
-
+par(mfrow = c(2, 2))
 bar1c=ar.rolling.window(Y,nprev,1,1,type="bic") #1-step AR forecast
+title(main = 'AR(1) 1-Step Forecast')
 bar3c=ar.rolling.window(Y,nprev,1,3,type="bic") #3-step AR forecast
+title(main = 'AR(1) 3-Step Forecast')
 bar6c=ar.rolling.window(Y,nprev,1,6,type="bic") #6-step AR forecast
+title(main = 'AR(1) 6-Step Forecast')
 bar12c=ar.rolling.window(Y,nprev,1,12,type="bic") #12-step AR forecast
+title(main = 'AR(1) 12-Step Forecast')
 
 #Benchmark forecast graphics:
 
@@ -139,31 +143,54 @@ arcoef.ts=ts(bar1c$coef, start=c(2010,1), end=c(2024,7), freq=12)
 colnames(arcoef.ts)=c("Constant","1st Lag","2nd Lag") #name columns to distinguish plots
 
 #Plot all the coefficients over time (plot.ts() same as plot, but for tme series objects):
-quartz()
+#quartz()
 plot.ts(arcoef.ts, main="AR regression coefficients", cex.axis=1.5)
 
-#Similarly, I create ts objects out of 1-step and 12-step benchmark forecasts
+#Similarly, I create ts objects out of 1-step to 12-step benchmark forecasts
 bench1.ts=ts(cbind(rw1c,bar1c$pred,oosy), start=c(2010,1), end=c(2024,7), freq=12)
 colnames(bench1.ts)=c("RW","AR(1)","True Value")
+
+bench3.ts=ts(cbind(rw3c,bar3c$pred,oosy), start=c(2010,1), end=c(2024,7), freq=12)
+colnames(bench3.ts)=c("RW","AR(1)","True Value")
+
+bench6.ts=ts(cbind(rw6c,bar6c$pred,oosy), start=c(2010,1), end=c(2024,7), freq=12)
+colnames(bench6.ts)=c("RW","AR(1)","True Value")
 
 bench12.ts=ts(cbind(rw12c,bar12c$pred,oosy), start=c(2010,1), end=c(2024,7), freq=12)
 colnames(bench12.ts)=c("RW","AR(1)","True Value")
 
 #Plot 1-step forecasts:
+par(mfrow = c(2, 2))
+#quartz()
+# plot.ts(bench1.ts[,1], main="1-step Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="blue", ylab="INDRPO")
+# points(bench1.ts[,2], type="l", col="red",lwd=1.8) # AR(1) Model
+# points(bench1.ts[,3], type="l", col="black",lwd=2) #True Value
+# legend("bottomleft",legend=c("RW","AR(1)","INDPRO"))
 
-quartz()
-plot.ts(bench1.ts[,1], main="1-step Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="blue", ylab="INDRPO")
+plot.ts(bench1.ts[,3], main="1-step AR Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="black", ylab="INDRPO") #True Value
 points(bench1.ts[,2], type="l", col="red",lwd=1.8) # AR(1) Model
-points(bench1.ts[,3], type="l", col="black",lwd=2) #True Value
-legend("bottomleft",legend=c("RW","AR(1)","INDPRO"))
+legend("bottomright",legend=c("AR(1)","INDPRO"),col = c("red", "black"),lwd = 1.8,lty = 1,cex = 0.4)
+
+#Plot 3-step forecasts:
+plot.ts(bench3.ts[,3], main="3-step AR Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="black", ylab="INDRPO") #True Value
+points(bench3.ts[,2], type="l", col="red",lwd=1.8) # AR(1) Model
+legend("bottomright",legend=c("AR(1)","INDPRO"),col = c("red", "black"),lwd = 1.8,lty = 1,cex = 0.4)
+
+#Plot 6-step forecasts:
+plot.ts(bench6.ts[,3], main="6-step AR Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="black", ylab="INDRPO") #True Value
+points(bench6.ts[,2], type="l", col="red",lwd=1.8) # AR(1) Model
+legend("bottomright",legend=c("AR(1)","INDPRO"),col = c("red", "black"),lwd = 1.8,lty = 1,cex = 0.4)
 
 #Plot 12-step forecasts:
 
-quartz()
-plot.ts(bench12.ts[,1], main="12-step Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="blue", ylab="INDPRO")
-points(bench12.ts[,2], type="l", col="red",lwd=1.8)
-points(bench12.ts[,3], type="l", col="black",lwd=2)
-legend("bottomleft",legend=c("RW","AR(1)","INDPRO"))
+#quartz()
+# plot.ts(bench12.ts[,1], main="12-step Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="blue", ylab="INDPRO")
+# points(bench12.ts[,2], type="l", col="red",lwd=1.8)
+# points(bench12.ts[,3], type="l", col="black",lwd=2)
+# legend("bottomleft",legend=c("RW","AR(1)","INDPRO"))
+plot.ts(bench12.ts[,3], main="12-step AR Benchmark forecasts", cex.axis=1.5, lwd=1.8, col="black", ylab="INDRPO") #True Value
+points(bench12.ts[,2], type="l", col="red",lwd=1.8) # AR(1) Model
+legend("bottomright",legend=c("AR(1)","INDPRO"),col = c("red", "black"),lwd = 1.8,lty = 1,cex = 0.4)
 
 #AR forecasts RMSE:
 
