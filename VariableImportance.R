@@ -1,6 +1,13 @@
 load("HybridModels.RData")
 library(ggplot2)
-
+library(glmnet)
+library(gbm)
+library(randomForest)
+library(hdm)
+library(rpart)
+library(tictoc)
+#install.packages("lsei") #package for finding weights using quadratic programming
+library(lsei)
 selected_rlasso_variables <- names(which(coef(rlasso.fit) != 0))
 
 importance_rf <- importance(rffit.ht)
@@ -54,6 +61,6 @@ ggplot(hybrid_importance_df, aes(x = reorder(Variable, IncNodePurity), y = IncNo
   labs(
     title = "Relative Importance of Selected Variables (Hybrid Model)",
     x = "Variable",
-    y = "Node Purity"
+    y = "Relative Importance"
   ) +
   theme_minimal()
