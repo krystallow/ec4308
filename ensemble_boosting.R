@@ -165,7 +165,7 @@ selected_vars <- importance_scores$var[importance_scores$rel.inf > 1]  # Keep va
 #######################
 library(gridExtra)
 
-full_indices <- (ntrain + 1):nrow(df)         
+full_indices <- seq_len(nrow(df))       
 test_indices <- (ntrain + 1):nrow(df)    
 
 actual_values <- data.frame(Index = full_indices, INDPRO = df[, "INDPRO"])
