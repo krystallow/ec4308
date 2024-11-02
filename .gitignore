@@ -9,3 +9,5 @@ rawdata.RData
 descriptive_table.xlsx
 correlation_matrix.xlsx
 >>>>>>> 25113c9 (ignore)
+forward_selection_MSE.pdf
+lasso_variables_selected.csv

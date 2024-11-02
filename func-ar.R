@@ -13,7 +13,7 @@
 
 #3) lag - the forecast horizon
 
-#4) type -  "fixed" will use the AR(4) in all cases; "bic" will select lags using BIC
+#4) type -  "fixed" will use the AR(2) in all cases; "bic" will select lags using BIC
 
 runAR=function(Y,indice,lag,type="fixed"){
   
@@ -21,12 +21,12 @@ runAR=function(Y,indice,lag,type="fixed"){
   Y=Y[,-ncol(Y)] #data without the dummy
   
   Y2=cbind(Y[,indice]) #Y variable (CPI if indice=1, or PCE-based inflation indice=2)
-  aux=embed(Y2,4+lag) #create 4 lags + forecast horizon shift (=lag option)
+  aux=embed(Y2,2+lag) #create 2 lags + forecast horizon shift (=lag option)
   y=aux[,1] #  Y variable aligned/adjusted for missing data due do lags
   X=aux[,-c(1:(ncol(Y2)*lag))] # lags of Y (predictors) corresponding to forecast horizon   
   
   if(lag==1){ 
-    X.out=tail(aux,1)[1:ncol(X)] #retrieve 4 last observations if one-step forecast 
+    X.out=tail(aux,1)[1:ncol(X)] #retrieve 2 last observations if one-step forecast 
   }else{
     X.out=aux[,-c(1:(ncol(Y2)*(lag-1)))] #delete first (h-1) columns of aux,  
     X.out=tail(X.out,1)[1:ncol(X)] #last observations: y_T,y_t-1...y_t-h
@@ -34,14 +34,14 @@ runAR=function(Y,indice,lag,type="fixed"){
   
   dum=tail(dum,length(y)) #cut the dummy to size to account for lost observations due to lags
   
-  if(type=="fixed"){ #if fixed at AR(4)
-    model=lm(y~X+dum) #estimate direct h-step AR(4) by OLS with the dummy
+  if(type=="fixed"){ #if fixed at AR(2)
+    model=lm(y~X+dum) #estimate direct h-step AR(2) by OLS with the dummy
     coef=coef(model)[1:(ncol(X)+1)] #extract coefficients
   }
   
   if(type=="bic"){ #if selection on BIC
     bb=Inf #initialize the "best BIC" at a huge number
-    for(i in seq(1,ncol(X),1)){ #try for every lag length 1:4
+    for(i in seq(1,ncol(X),1)){ #try for every lag length 1:2
       m=lm(y~X[,1:i]+dum) #estimate AR(i) by OLS with the dummy
       crit=BIC(m) #retrieve BIC
       if(crit<bb){ #if BIC improved
@@ -52,7 +52,7 @@ runAR=function(Y,indice,lag,type="fixed"){
       }
     }
     coef=rep(0,ncol(X)+1) #blank vector for coefficients
-    coef[1:length(ar.coef)]=ar.coef #fill in the model coefficients (zeros may remain if model less than order 4)
+    coef[1:length(ar.coef)]=ar.coef #fill in the model coefficients (zeros may remain if model less than order 2)
   }
   pred=c(1,X.out)%*%coef #make a forecast using the last few observations: a direct h-step forecast
   
@@ -68,16 +68,16 @@ runAR=function(Y,indice,lag,type="fixed"){
 
 #2) nprev - number of out-of-sample observations (at the end of the sample)
 
-#3) indice - index for dependent variable: 1 for CPI inflation, 2 for PCE inflation
+#3) indice - index for dependent variable
 
 #4) lag - the forecast horizon
 
-#5) type -  "fixed" will use the AR(4) in all cases; "bic" will select lags using BIC
+#5) type -  "fixed" will use the AR(2) in all cases; "bic" will select lags using BIC
 
 
 ar.rolling.window=function(Y,nprev,indice=1,lag=1,type="fixed"){
   
-  save.coef=matrix(NA,nprev,5) #blank matrix for coefficients at each iteration
+  save.coef=matrix(NA,nprev,3) #blank matrix for coefficients at each iteration
   save.pred=matrix(NA,nprev,1) #blank for forecasts
   for(i in nprev:1){  #NB: backwards FOR loop: going from 180 down to 1
     
