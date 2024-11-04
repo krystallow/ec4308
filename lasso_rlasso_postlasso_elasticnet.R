@@ -225,3 +225,52 @@ selected_vars <- list(
 )
 
 print(selected_vars)
+
+
+##################################
+### Plot graph for Elastic Net ###
+##################################
+ntrain <- length(yy) - nprev  # Number of in-sample observations
+test_indices <- (ntrain + 1):length(yy)  # Indices for the out-of-sample observations
+
+
+library(gridExtra)
+
+full_indices <- seq_len(nrow(df))       
+
+actual_values <- data.frame(Index = test_indices, INDPRO = df[test_indices, "INDPRO"])
+
+# 1-step forecast plot
+forecasted_values_1 <- data.frame(Index = test_indices, INDPRO = elasticnet1c$pred)
+p1 <- ggplot() +
+  geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
+  geom_line(data = forecasted_values_1, aes(x = Index, y = INDPRO), color = "red", size = 1) +
+  labs(title = "Elastic Net Forecast Horizon: 1 Step", x = "Observation Index", y = "INDPRO") +
+  theme_minimal()
+
+# 3-step forecast plot
+forecasted_values_3 <- data.frame(Index = test_indices, INDPRO = elasticnet3c$pred)
+p3 <- ggplot() +
+  geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
+  geom_line(data = forecasted_values_3, aes(x = Index, y = INDPRO), color = "red", size = 1) +
+  labs(title = "Elastic Net Forecast Horizon: 3 Steps", x = "Observation Index", y = "INDPRO") +
+  theme_minimal()
+
+# 6-step forecast plot
+forecasted_values_6 <- data.frame(Index = test_indices, INDPRO = elasticnet6c$pred)
+p6 <- ggplot() +
+  geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
+  geom_line(data = forecasted_values_6, aes(x = Index, y = INDPRO), color = "red", size = 1) +
+  labs(title = "Elastic Net Forecast Horizon: 6 Steps", x = "Observation Index", y = "INDPRO") +
+  theme_minimal()
+
+# 12-step forecast plot
+forecasted_values_12 <- data.frame(Index = test_indices, INDPRO = elasticnet12c$pred)
+p12 <- ggplot() +
+  geom_line(data = actual_values, aes(x = Index, y = INDPRO), color = "black", size = 1) +
+  geom_line(data = forecasted_values_12, aes(x = Index, y = INDPRO), color = "red", size = 1) +
+  labs(title = "Elastic Net Forecast Horizon: 12 Steps", x = "Observation Index", y = "INDPRO") +
+  theme_minimal()
+
+# Arrange all plots
+grid.arrange(p1, p3, p6, p12, ncol = 2)
