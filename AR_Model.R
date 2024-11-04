@@ -130,6 +130,18 @@ title(main = 'AR(1) 6-Step Forecast')
 bar12c=ar.rolling.window(Y,nprev,1,12,type="bic") #12-step AR forecast
 title(main = 'AR(1) 12-Step Forecast')
 
+## AR for DM test against hybrid and combination models
+nprev = 101
+par(mfrow = c(2, 2))
+bar1c_101=ar.rolling.window(Y,nprev,1,1,type="bic") #1-step AR forecast
+title(main = 'AR(1) 1-Step Forecast')
+bar3c_101=ar.rolling.window(Y,nprev,1,3,type="bic") #3-step AR forecast
+title(main = 'AR(1) 3-Step Forecast')
+bar6c_101=ar.rolling.window(Y,nprev,1,6,type="bic") #6-step AR forecast
+title(main = 'AR(1) 6-Step Forecast')
+bar12c_101=ar.rolling.window(Y,nprev,1,12,type="bic") #12-step AR forecast
+title(main = 'AR(1) 12-Step Forecast')
+
 #Benchmark forecast graphics:
 
 #Plot benchmark coefficients
