@@ -168,7 +168,7 @@ library(gridExtra)
 full_indices <- seq_len(nrow(df))       
 test_indices <- (ntrain + 1):nrow(df)    
 
-actual_values <- data.frame(Index = full_indices, INDPRO = df[, "INDPRO"])
+actual_values <- data.frame(Index = test_indices, INDPRO = df[test_indices, "INDPRO"])
 
 # 1-step forecast plot
 forecasted_values_1 <- data.frame(Index = test_indices, INDPRO = boost1c$pred)
