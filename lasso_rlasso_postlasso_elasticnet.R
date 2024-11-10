@@ -11,7 +11,7 @@ library(githubinstall)
 githubinstall("HDeconometrics")
 library(HDeconometrics)
 
-RMSE <- function(pred, truth){ #start and end body of the function by { } - same as a loop 
+RMSE <- function(pred, truth){ 
   return(sqrt(mean((truth - pred)^2)))
 }
 
